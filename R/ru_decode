@@ -1,0 +1,167 @@
+#' Add formated coded variables using codelist (format) 
+#'
+#' Pass in a data along with identification options and have decoded columns derived.
+#'
+#' @param dsetin The data set that will be ounted to generate descriptive statistics.
+#' @param codedecodevarpairs Paired code and decode columns for which the dcode column will be derived.
+#' @param varcodelistpairs Paired column and codelist (format) for the column.
+#' @param codelistnames A list of codelist (format) 
+#' @param dsplan The hath and filename of tab-delimited file containing HARP A&R dataset plan.
+#'
+#' @return A data frame based on the incoming data frame but collapsed by groups with descriptive statistics added.
+#'
+#' @author Yongwei Wang, \email{yongwei.x.wang@viivhealthcare.com} \cr
+#'         Chris Rook, \email{christopher.x.rook@gsk.com}
+#'
+#' @examples
+#'
+#' @export
+#'
+ru_decode <- function (dsetin, codedecodevarpairs=NULL, varcodelistpairs=NULL, codelistnames=list(), dsplan=NULL) {
+  
+  # dsetin = df_lastdset
+  # dsplan = "C:/usr/R/yw62951_viiv_dev/ADSNAP/adsnap_spec.txt"
+  # codedecodevarpairs=c("SEX", "SEXC", "COUNTRY", "ACOUNTRY")
+  # varcodelistpairs=c("COUNTRY", "COUNTRY", "AGEGR1N", "AGEGR")
+  # codelistnames=fmtlist
+  
+  
+  df_dsetin_vars <- tibble::tibble(
+    VARIABLE.NAME = names(dsetin),
+    TYPE = unlist(lapply(dsetin, class))[VARIABLE.NAME]
+  )
+  
+  df_codedecode <- NULL
+  df_dsetin_other <- NULL
+  if (! is.null(codedecodevarpairs)) {
+    df_codedecode <- tibble::tibble(
+      VARIABLE.NAME = codedecodevarpairs[seq(1, length(codedecodevarpairs), by=2)],
+      DECODE.NAME = codedecodevarpairs[seq(2, length(codedecodevarpairs), by=2)]
+      )
+    df_dsetin_other <-  df_dsetin_vars |> 
+      dplyr::filter(VARIABLE.NAME %in% !! codedecodevarpairs[seq(1, length(codedecodevarpairs), by=2)]) %>%
+      dplyr::mutate(DECODE.FORMAT=NA_character_) %>%
+      dplyr::left_join(df_codedecode, by="VARIABLE.NAME")
+  }
+  df_codelist <- NULL
+  if (! is.null(varcodelistpairs)) {
+    df_codelist <- tibble::tibble(
+      VARIABLE.NAME = varcodelistpairs[seq(1, length(varcodelistpairs), by=2)],
+      DECODE.FORMAT = varcodelistpairs[seq(2, length(varcodelistpairs), by=2)]
+    )
+  }
+  
+  codelistnames[["FLS"]] <- list(START=c("N", "Y"), LABEL=c(0, 1))
+
+  # Variable ended with "FN"
+  df_dsetin_fn <-  df_dsetin_vars |> dplyr::select(VARIABLE.NAME) |> dplyr::filter(grepl("FN$", VARIABLE.NAME )) %>%
+    dplyr::mutate(DECODE.NAME=gsub("FN$", "FL", VARIABLE.NAME)) %>% dplyr::mutate(DECODE.FORMAT="YNN", TYPE="character") %>%
+    dplyr::filter(! DECODE.NAME %in% names(dsetin))
+  
+  df_dsetin_fl <-  df_dsetin_vars |> dplyr::select(VARIABLE.NAME) |> dplyr::filter(grepl("FL$", VARIABLE.NAME )) %>%
+    dplyr::mutate(DECODE.NAME=gsub("FL$", "FN", VARIABLE.NAME)) %>% dplyr::mutate(DECODE.FORMAT="FLS", TYPE="numeric") %>%
+    dplyr::filter(! DECODE.NAME %in% names(dsetin))
+  
+  df_dsetin_codevars <- dplyr::bind_rows(df_dsetin_fl, df_dsetin_fn, df_dsetin_other)
+  
+  if (! is.null(df_codedecode)) {
+    df_dsetin_codevars <- dplyr::full_join(df_dsetin_codevars, df_codedecode, by=c("VARIABLE.NAME")) %>%
+      dplyr::mutate(DECODE.NAME=ifelse(is.na(DECODE.NAME.y), DECODE.NAME.x, DECODE.NAME.y)) %>%
+      dplyr::select(-DECODE.NAME.x, -DECODE.NAME.y) %>%
+      dplyr::filter(! DECODE.NAME %in% names(dsetin))
+  }
+  
+  bln_CheckParam <- FALSE
+  
+  #
+  # Get codelist from HARP data specification file
+  #
+  if (! is.null(dsplan) ) {
+    # Column title: there is a missing \t in column title for spec created in Harp.
+    df_varattr_label <- utils::read.table(dsplan, header = FALSE, sep = "\t", dec = ".", skip=3, nrow=1,
+                                          row.names=NULL, quote = "", stringsAsFactors = FALSE, fill=TRUE)
+    # Column values
+    df_varattr <- utils::read.table(dsplan, header = FALSE, sep = "\t", dec = ".", skip=4,
+                                    row.names=NULL, quote = "", stringsAsFactors = FALSE, fill=TRUE)
+    
+    str_varattr_name <- NULL
+    for ( i in 1:length(df_varattr_label)) {
+      if (is.null(str_varattr_name)) str_varattr_name <- base::toupper(base::gsub("\\s+", ".", df_varattr_label[i]))
+      else str_varattr_name <- c(str_varattr_name, base::toupper(base::gsub("\\s+", ".", df_varattr_label[i])))
+    }
+    
+    # define column names instead of getting column names from file.
+    str_varattr_name <- c("VARIABLE.NAME", "VARIABLE.LABEL", "CRT.INCLUSION.FLAG", "TYPE", "SAS.LENGTH", 
+                          "SAS.FORMAT", "DERIVATION", "COMMENTS", "ACRF.PAGES", "VARIABLE.ORDER", "SORT.ORDER",
+                          "DECODE.FORMAT", "COMPUTATIONAL.METHOD", "REQUIRED", "SIGNIFICANT.DIGITS", "VALUE.LEVEL.METADATA",
+                          "ORIGIN.ROLE")
+    
+    names(df_varattr) <- str_varattr_name
+    str_dsetin_names <- names(dsetin)
+    
+ 
+    df_plan <- df_varattr |> dplyr::select(VARIABLE.NAME, DECODE.FORMAT) |>
+      dplyr::filter(!is.na(DECODE.FORMAT) & DECODE.FORMAT != "" & ! stringr::str_detect(DECODE.FORMAT, "\\.$")) |>
+      dplyr::filter(VARIABLE.NAME %in% str_dsetin_names) %>%
+      dplyr::mutate(DECODE.FORMAT=ifelse(DECODE.FORMAT %in% c("", "NA", "N/A"), NA_character_, DECODE.FORMAT))
+    
+    df_dsetin_codevars <- dplyr::left_join(df_dsetin_codevars, df_plan, by=c("VARIABLE.NAME")) %>%
+      dplyr::mutate(DECODE.FORMAT=ifelse(is.na(DECODE.FORMAT.x), DECODE.FORMAT.y, DECODE.FORMAT.x)) %>%
+      dplyr::select(-DECODE.FORMAT.x, -DECODE.FORMAT.y)
+    
+    df_dsetin_codevars <- dplyr::left_join(df_dsetin_codevars, df_varattr |> dplyr::select(VARIABLE.NAME , TYPE) |> dplyr::rename(DECODE.NAME=VARIABLE.NAME), 
+                                           by=c("DECODE.NAME")) %>%
+      dplyr::mutate(TYPE=ifelse(is.na(TYPE.x), TYPE.y, TYPE.x)) %>% dplyr::mutate(TYPE=ifelse(TYPE=="Char", "character", ifelse(TYPE=="Num", "Numeric", TYPE))) %>%
+      dplyr::select(-TYPE.x, -TYPE.y)  
+  }
+  
+  if (! is.null(df_codelist)) {
+    df_dsetin_codevars <- dplyr::left_join(df_dsetin_codevars, df_codelist, by=c("VARIABLE.NAME")) %>%
+      dplyr::mutate(DECODE.FORMAT=ifelse(is.na(DECODE.FORMAT.y), DECODE.FORMAT.x, DECODE.FORMAT.y)) %>%
+      dplyr::select(-DECODE.FORMAT.x, -DECODE.FORMAT.y)
+  }
+
+  df_dsetin_codevars <- df_dsetin_codevars %>% dplyr::filter(! is.na(DECODE.NAME)) %>%
+    dplyr::filter(DECODE.FORMAT %in% !! names(codelistnames))
+  
+  #
+  # Add decode variables to inptut dataset
+  #
+  df_out <- dsetin
+  for (j in 1:nrow(df_dsetin_codevars)){
+    str_fmt <- codelistnames[[df_dsetin_codevars[["DECODE.FORMAT"]][j]]] 
+    str_codevar <- df_dsetin_codevars[["VARIABLE.NAME"]][j]
+    str_decodevar <- df_dsetin_codevars[["DECODE.NAME"]][j]
+    str_type <- df_dsetin_codevars[["TYPE"]][j]    
+    
+    if (is.null(str_fmt)) {
+      message(paste0("ru_decode: format is not availabe and can not be decoded for code variable ", str_codevar))
+      next
+    }
+    df_dslsts <- list()
+    if ('END' %in% names(str_fmt)){
+      i=1
+      for (str_start in str_fmt$START){
+        exprs <- paste0(str_start,' <= ', str_codevar,' & ', str_codevar,' <= ',df_fmt$END[[i]])
+        df_out %>% dplyr::filter(eval(parse(text=exprs))) -> df_dslsts[[i]]
+        if  (is.na(str_type) || str_type == "numeric") {
+          df_dslsts[[i]][[str_decodevar]] <- as.numeric(df_fmt$LABEL[[i]])
+        } else {
+          df_dslsts[[i]][[str_decodevar]] <- df_fmt$LABEL[[i]]
+        }
+        i <- i+1
+      }
+      df_catset <- dplyr::bind_rows(df_dslsts)
+      df_out %>% dplyr::anti_join(df_catset[, str_codevar]) -> df_remain
+      df_remain[[str_decodevar]] <- NA 
+      dplyr::bind_rows(df_catset,df_remain) -> df_out
+    } else {
+      utils::unstack(utils::stack(str_fmt)) -> df_fmt
+      if (is.numeric(df_out[[str_codevar]])){df_fmt %>% dplyr::mutate(START=as.numeric(START)) -> df_fmt}
+      if (is.na(str_type) || str_type == "numeric") {df_fmt %>% dplyr::mutate(LABEL=as.numeric(LABEL)) -> df_fmt}
+      df_fmt %>% dplyr::rename(!! str_codevar := START) -> df_fmt
+      df_out %>% dplyr::left_join(df_fmt, by=str_codevar) %>% dplyr::mutate(!! str_decodevar := LABEL) %>% dplyr::select(-LABEL) -> df_out
+    }
+  }
+  return(df_out) 
+}
