@@ -1,0 +1,23 @@
+#========================================================================= 
+# Author:  Yongwei Wang
+# Program: ru_dropadlsvars.R
+# Purpose: Drop ADSL variables from input dataset
+# Date:    03/28/2025
+#========================================================================= 
+
+ru_dropadlsvars <- function (dsetin, dsetinadsl, keepvars=c("STUDYID", "USUBJID", "SUBJID")) {
+  print(paste0("RU_DROPADSLVARS: ", "Start of RU_DROPADSLVARS"))
+  s_dsetinnames <- names(dsetin)
+  s_adslvarnames <- names(dsetinadsl)
+  s_commvars <- dplyr::intersect(s_dsetinnames, s_adslvarnames)
+  
+  if (!is.null(keepvars)) {
+    s_commvars <- dplyr::setdiff(s_commvars, keepvars)
+  }
+  if (length(s_commvars) > 0) {
+    dsetout <- dsetin %>% dplyr::select(-all_of(s_commvars))
+    return(dsetout)
+  } else {
+    return(dsetin)
+  }
+}
