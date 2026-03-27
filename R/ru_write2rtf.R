@@ -25,8 +25,8 @@ ru_write2rtf <- function(
     footers=list("left"=paste0(rfenv$G_USERID, ": ", rfenv$G_PGMPTH, " ", format(Sys.time(), "%Y-%m-%d %T"))),
     titlelinebreakchar="\a",
     titleblanku8char="\u0A00",
-    linepaces=0,
-    marginsininch=c("top"=1.25, "bottom"=1, "left"=1, "right"=1)
+    marginsininch=c("top"=1.25, "bottom"=1, "left"=1, "right"=1),
+    scale=1
 ) {
 
   this_rtf_escape <- function(text) {
@@ -52,7 +52,7 @@ ru_write2rtf <- function(
   
   # Define a line break and a blank space string which will be used in gt table and will be replaced in LaTex.  
   str_s.hold_space <- titleblanku8char
-  str_s.hold_space_rtf <- paste0("\\\\u", base::utf8ToInt(titleblanku8char))
+  str_s.hold_space_rtf <- paste0("\\\\u", base::utf8ToInt(titleblanku8char), " ")
   str_s.line_break <- titlelinebreakchar
   
   num_n.tmargin <- base::ifelse("top" %in% names(marginsininch), marginsininch["top"], 1.25)
@@ -88,28 +88,34 @@ ru_write2rtf <- function(
     str_s.orientation="landscape"
     num_n.page_height <- 8.5
     num_n.page_width <- 11    
-    str_s.dtype <- "TXT"
   } else if (base::substr(str_s.ext_t, 1, 1) == "P") {
     str_s.orientation="portrait"
     num_n.page_height <- 11
     num_n.page_width <- 8.5
-    str_s.dtype <- "TXT"
   } else {
     str_s.orientation="landscape"
     num_n.page_height <- 11
     num_n.page_width <- 8.5
-    str_s.dtype <- str_s.ext
   }
   
-  list_l.lsmvar <- list("P08"=90, "P09"=80, "P10"=72, "P11"=65, "P12"=64 , "L08"=135, "L09"=120, "L10"=108, "L11"=98, "L12"=90)
-  list_l.psmvar <- list("P08"=83, "P09"=74, "P10"=67, "P11"=61, "P12"=56 , "L08"=54,  "L09"=48,  "L10"=43,  "L11"=39, "L12"=36)
-  num_n.n.linesize <- unlist(list_l.lsmvar[str_s.ext_t])
-  num_n.n.pagesize <- unlist(list_l.psmvar[str_s.ext_t])
+  # list_l.lsmvar <- list("P08"=90, "P09"=80, "P10"=72, "P11"=65, "P12"=64 , "L08"=135, "L09"=120, "L10"=108, "L11"=98, "L12"=90)
+  # list_l.psmvar <- list("P08"=83, "P09"=74, "P10"=67, "P11"=61, "P12"=56 , "L08"=54,  "L09"=48,  "L10"=43,  "L11"=39, "L12"=36)
+  # num_n.linesize <- unlist(list_l.lsmvar[str_s.ext_t])
+  # num_n.pagesize <- unlist(list_l.psmvar[str_s.ext_t])
   
   num_n.font_size <- as.numeric(sub(".*?(\\d+).*", "\\1", str_s.ext_t))
-  num_n.font_size_1  <- num_n.font_size * 1.045 # adjusted for text output
+  num_n.linesize <- round(((num_n.page_width - num_n.lmargin - num_n.rmargin)/((num_n.font_size * 0.6)/72)), 0)
+  num_n.pagesize <- round(((num_n.page_height - num_n.tmargin - num_n.bmargin)/((num_n.font_size * 1.145)/72)), 0)
+  if (str_s.outType == "GT") {
+    num_n.space    <- num_n.font_size * 10 * 2 + 2
+  } else {
+    num_n.space    <- num_n.font_size * 10 * 2
+  }
   
-  num_n.n.numofpages <- if (str_s.outType == "TEXT") base::sum(stringr::str_count(inobj, "\f")) + 1 else length(gt_tbl)
+  # print(c(str_s.ext_t, str_s.orientation, num_n.font_size, num_n.linesize, num_n.pagesize))
+  # print(c(num_n.page_width, num_n.page_height, num_n.lmargin, num_n.rmargin, num_n.tmargin, num_n.bmargin))
+  
+  num_n.numofpages <- if (str_s.outType == "TEXT") base::sum(stringr::str_count(inobj, "\f")) + 1 else length(gt_tbl)
   
   # headers
   str_s.leftheaders <- if ("left" %in% names(headers)) unlist(headers[["left"]]) else ""
@@ -120,31 +126,49 @@ ru_write2rtf <- function(
   str_s.rightheaders <- base::unlist(stringr::str_split(this_rtf_escape(str_s.rightheaders), "\n"))
   str_s.centerheaders <- base::unlist(stringr::str_split(this_rtf_escape(str_s.centerheaders), "\n"))
   
-  num_n.n.headers <- base::max(length(str_s.rightheaders), length(str_s.leftheaders), length(str_s.centerheaders))
-  if (num_n.n.headers == 1 & base::gsub(" *", "", paste(str_s.rightheaders, str_s.leftheaders, str_s.centerheaders, sep="", collapse="")) == "") num_n.n.headers <- 0
+  num_n.headers <- base::max(length(str_s.rightheaders), length(str_s.leftheaders), length(str_s.centerheaders))
+  if (num_n.headers == 1 & base::gsub(" *", "", paste(str_s.rightheaders, str_s.leftheaders, str_s.centerheaders, sep="", collapse="")) == "") num_n.headers <- 0
   
-  if (num_n.n.headers > length(str_s.rightheaders)) str_s.rightheaders <- c(str_s.rightheaders, base::rep(" ", num_n.n.headers - length(str_s.rightheaders)))
-  if (num_n.n.headers > length(str_s.leftheaders)) str_s.leftheaders <- c(str_s.leftheaders, base::rep(" ", num_n.n.headers - length(str_s.leftheaders)))
-  if (num_n.n.headers > length(str_s.centerheaders)) str_s.centerheaders <- c(str_s.centerheaders, base::rep(" ", num_n.n.headers - length(str_s.centerheaders)))
+  if (num_n.headers > length(str_s.rightheaders)) str_s.rightheaders <- c(str_s.rightheaders, base::rep(" ", num_n.headers - length(str_s.rightheaders)))
+  if (num_n.headers > length(str_s.leftheaders)) str_s.leftheaders <- c(str_s.leftheaders, base::rep(" ", num_n.headers - length(str_s.leftheaders)))
+  if (num_n.headers > length(str_s.centerheaders)) str_s.centerheaders <- c(str_s.centerheaders, base::rep(" ", num_n.headers - length(str_s.centerheaders)))
   
   str_s.headers <- NULL
-  str_s.page_text <- paste0("pageof", base::strrep("x", nchar(num_n.n.numofpages) * 2 + 3))
-  if (num_n.n.headers > 0) {
-    for (k in 1:num_n.n.headers) {
+  str_s.page_text <- paste0("pageof", base::strrep("x", nchar(num_n.numofpages) * 2 + 3))
+  if (num_n.headers > 0) {
+    for (k in 1:num_n.headers) {
       str_s.temp_left <- base::gsub("pageof", str_s.page_text, str_s.leftheaders[k], fixed = TRUE)
       str_s.temp_right <- base::gsub("pageof", str_s.page_text, str_s.rightheaders[k], fixed = TRUE)
       str_s.temp_center <- base::gsub("pageof", str_s.page_text, str_s.centerheaders[k], fixed = TRUE)
       
-      str_s.tmp <- paste0(str_s.temp_left, base::strrep(" ", num_n.n.linesize))
-      if (! str_s.temp_center %in% c("", " ")) str_s.tmp <- paste0(base::substring(str_s.tmp, 1, base::floor((num_n.n.linesize - base::nchar(str_s.temp_center))/2)), str_s.temp_center)
+      str_s.tmp <- paste0(str_s.temp_left, base::strrep(" ", num_n.linesize))
+      if (! str_s.temp_center %in% c("", " ")) str_s.tmp <- paste0(base::substring(str_s.tmp, 1, base::floor((num_n.linesize - base::nchar(str_s.temp_center))/2)), str_s.temp_center)
       if (str_s.temp_right %in% c("", " ")) str_s.temp_right <- ""
-      str_s.tmp <- paste0(base::substring(str_s.tmp, 1, num_n.n.linesize - base::nchar(str_s.temp_right)),  str_s.temp_right)
-      str_s.headers <- c(str_s.headers, paste0(paste0("\\pard\\ql ", "\\f2\\fs", num_n.font_size * 2, " ", str_s.tmp), " \\par"))
+      str_s.tmp <- paste0(base::substring(str_s.tmp, 1, num_n.linesize - base::nchar(str_s.temp_right)),  str_s.temp_right)
+      if (grepl("_", str_s.tmp, fixed = TRUE)) {
+        # str_s.headers <- c(str_s.headers, paste0(paste0("\\pard\\ql ", "\\f2\\fs", num_n.font_size * 2, " ", str_s.tmp), " \\par"))
+        if (k < num_n.headers) {
+          str_s.headers <- c(str_s.headers, 
+                             sprintf("\\pard\\plain\\ql \\f2\\fs%s %s \\par", num_n.font_size * 2, str_s.tmp))    
+        } else {
+          str_s.headers <- c(str_s.headers, 
+                             sprintf("\\pard\\plain\\ql \\f2\\fs%s %s", num_n.font_size * 2, str_s.tmp))             
+        }
+      } else {
+        if (k < num_n.headers) {
+          str_s.headers <- c(str_s.headers, 
+                           sprintf("\\pard\\plain\\ql \\sl-%s\\slmult0 \\f2\\fs%s %s \\par", num_n.space, num_n.font_size * 2, str_s.tmp))
+        } else {
+          str_s.headers <- c(str_s.headers, 
+                             sprintf("\\pard\\plain\\ql \\sl-%s\\slmult0 \\f2\\fs%s %s", num_n.space, num_n.font_size * 2, str_s.tmp))        
+        }
+      }
     }  
     str_s.headers[1] <- paste0("{\\header ", str_s.headers[1])
     str_s.headers[length(str_s.headers)] <- paste0(str_s.headers[length(str_s.headers)], "}")
-    str_s.headers <- base::gsub(str_s.page_text, paste0("Page {\\chpgn} of ", num_n.n.numofpages), str_s.headers, fixed = TRUE)
+    str_s.headers <- base::gsub(str_s.page_text, paste0("Page {\\chpgn} of ", num_n.numofpages), str_s.headers, fixed = TRUE)
   } 
+  
   
   # footers
   str_s.leftfooters <- if ("left" %in% names(footers)) unlist(footers[["left"]]) else ""
@@ -155,49 +179,59 @@ ru_write2rtf <- function(
   str_s.rightfooters <- base::unlist(stringr::str_split(this_rtf_escape(str_s.rightfooters), "\n"))
   str_s.centerfooters <- base::unlist(stringr::str_split(this_rtf_escape(str_s.centerfooters), "\n"))
   
-  num_n.n.footers <- base::max(length(str_s.rightfooters), length(str_s.leftfooters), length(str_s.centerfooters))
-  if (num_n.n.footers == 1 && base::gsub(" *", "", paste0(str_s.rightfooters, str_s.leftfooters, str_s.centerfooters)) == "") num_n.n.footers <- 0
+  num_n.footers <- base::max(length(str_s.rightfooters), length(str_s.leftfooters), length(str_s.centerfooters))
+  if (num_n.footers == 1 && base::gsub(" *", "", paste0(str_s.rightfooters, str_s.leftfooters, str_s.centerfooters)) == "") num_n.footers <- 0
   
-  if (num_n.n.footers > length(str_s.rightfooters)) str_s.rightfooters <- c(str_s.rightfooters, base::rep(" ", num_n.n.footers - length(str_s.rightfooters)))
-  if (num_n.n.footers > length(str_s.leftfooters)) str_s.leftfooters <- c(str_s.leftfooters, base::rep(" ", num_n.n.footers - length(str_s.leftfooters)))
-  if (num_n.n.footers > length(str_s.centerfooters)) str_s.centerfooters <- c(str_s.centerfooters, base::rep(" ", num_n.n.footers - length(str_s.centerfooters)))
+  if (num_n.footers > length(str_s.rightfooters)) str_s.rightfooters <- c(str_s.rightfooters, base::rep(" ", num_n.footers - length(str_s.rightfooters)))
+  if (num_n.footers > length(str_s.leftfooters)) str_s.leftfooters <- c(str_s.leftfooters, base::rep(" ", num_n.footers - length(str_s.leftfooters)))
+  if (num_n.footers > length(str_s.centerfooters)) str_s.centerfooters <- c(str_s.centerfooters, base::rep(" ", num_n.footers - length(str_s.centerfooters)))
   
   str_s.footers <- NULL
-  if (num_n.n.footers > 0) {
-    for (k in 1:num_n.n.footers) {
+  if (num_n.footers > 0) {
+    for (k in 1:num_n.footers) {
       str_s.temp_left <- base::gsub("pageof", str_s.page_text, str_s.leftfooters[k], fixed = TRUE)
       str_s.temp_right <- base::gsub("pageof", str_s.page_text, str_s.rightfooters[k], fixed = TRUE)
       str_s.temp_center <- base::gsub("pageof", str_s.page_text, str_s.centerfooters[k], fixed = TRUE)
       
-      str_s.tmp <- paste0(str_s.temp_left, base::strrep(" ", num_n.n.linesize))
-      if (! str_s.temp_center %in% c("", " ")) str_s.tmp <- paste0(base::substring(str_s.tmp, 1, base::floor((num_n.n.linesize - base::nchar(str_s.temp_center))/2)), str_s.temp_center)
+      str_s.tmp <- paste0(str_s.temp_left, base::strrep(" ", num_n.linesize))
+      if (! str_s.temp_center %in% c("", " ")) str_s.tmp <- paste0(base::substring(str_s.tmp, 1, base::floor((num_n.linesize - base::nchar(str_s.temp_center))/2)), str_s.temp_center)
       if (str_s.temp_right %in% c("", " ")) str_s.temp_right <- ""
-      str_s.tmp <- paste0(base::substring(str_s.tmp, 1, num_n.n.linesize - base::nchar(str_s.temp_right)),  str_s.temp_right)
-      str_s.footers <- c(str_s.footers, paste0(paste0("\\pard\\ql ", "\\f2\\fs", num_n.font_size * 2, " ", str_s.tmp), " \\par"))
+      str_s.tmp <- paste0(base::substring(str_s.tmp, 1, num_n.linesize - base::nchar(str_s.temp_right)),  str_s.temp_right)
+      if (grepl("_", str_s.tmp, fixed = TRUE)) {
+        if (k < num_n.footers) {
+          str_s.footers <- c(str_s.footers, 
+                             sprintf("\\pard\\plain\\ql \\f2\\fs%s %s \\par", num_n.font_size * 2, str_s.tmp))    
+        } else {
+          str_s.footers <- c(str_s.footers, 
+                             sprintf("\\pard\\plain\\ql \\f2\\fs%s %s", num_n.font_size * 2, str_s.tmp))             
+        }
+      } else {
+        if (k < num_n.footers) {
+          str_s.footers <- c(str_s.footers, 
+                             sprintf("\\pard\\plain\\ql \\sl-%s\\slmult0 \\f2\\fs%s %s \\par", num_n.space, num_n.font_size * 2, str_s.tmp))
+        } else {
+          str_s.footers <- c(str_s.footers, 
+                             sprintf("\\pard\\plain\\ql \\sl-%s\\slmult0 \\f2\\fs%s %s", num_n.space, num_n.font_size * 2, str_s.tmp))        
+        }
+      }
     }  
     str_s.footers[1] <- paste0("{\\footer ", str_s.footers[1])
     str_s.footers[length(str_s.footers)] <- paste0(str_s.footers[length(str_s.footers)], "}")
-    str_s.footers <- base::gsub(str_s.page_text, paste0("Page {\\chpgn} of ", num_n.n.numofpages), str_s.footers, fixed = TRUE)
+    str_s.footers <- base::gsub(str_s.page_text, paste0("Page {\\chpgn} of ", num_n.numofpages), str_s.footers, fixed = TRUE)
   } 
 
   # --- Build LaTeX wrapper content ---
   
-  num_n.n.headerheight <- num_n.font_size * num_n.n.headers * 1.2
-  num_n.n.footerheight <- num_n.font_size * (num_n.n.footers) * 1.2
-  
-  # num_n.n.footerheight <- base::ceiling(num_n.n.footers * (num_n.page_height - num_n.tmargin - num_n.bmargin)/(num_n.n.pagesize)  * 72)
-
-  if (str_s.outType == "GT") num_n.font_size_1 <- num_n.font_size else
-    num_n.font_size_1 <- num_n.font_size * 1.045
+  num_n.headerheight <- num_n.font_size * num_n.headers * 1.2
+  num_n.footerheight <- num_n.font_size * (num_n.footers) * 1.2
     
-  # num_n.bmargin_1 <- base::ifelse(num_n.n.footers == 0, num_n.bmargin, num_n.bmargin + (num_n.n.footers + 0) * num_n.font_size / 72)
-  # num_n.tmargin_1 <- base::ifelse(num_n.n.headers == 0, num_n.tmargin, num_n.tmargin + (num_n.n.headers + 0) * num_n.font_size / 72)
+  # num_n.bmargin_1 <- base::ifelse(num_n.footers == 0, num_n.bmargin, num_n.bmargin + (num_n.footers + 0) * num_n.font_size / 72)
+  # num_n.tmargin_1 <- base::ifelse(num_n.headers == 0, num_n.tmargin, num_n.tmargin + (num_n.headers + 0) * num_n.font_size / 72)
   num_n.bmargin_1 <- num_n.bmargin
   num_n.tmargin_1 <- num_n.tmargin
 
   # --- Build RTF wrapper content ---
 
-  num_n.space    <- num_n.font_size * 10 * 2 + linepaces
   str_s.condent  <- ""
   
   # Initialize the Character Vector
@@ -218,11 +252,23 @@ ru_write2rtf <- function(
     '{\\f60\\fmodern\\fcharset161\\fprq1 Courier New Greek;}',
     '{\\f61\\fmodern\\fcharset162\\fprq1 Courier New Tur;}',
     '{\\f62\\fmodern\\fcharset186\\fprq1 Courier New Baltic;}}',
-    '{\\stylesheet{\\widctlpar\\adjustright \\fs20\\cgrid \\snext0 Normal;}',
+    sprintf('{\\stylesheet{\\widctlpar\\adjustright \\fs%s\\cgrid \\snext0 Normal;}', num_n.font_size * 2),
     '{\\*\\cs10 \\additive Default Paragraph Font;}}',
     str_s.headers,
     str_s.footers
   )
+  
+  str_s.rtf_table_break_lines <- c(
+    "\\page \\pard\\plain \\f2\\fs1\\sl0 \\par",
+    "{"
+  )
+  
+  # str_s.rtf_table_break_lines <- c(
+  #   sprintf('{\\page\\stylesheet{\\widctlpar\\adjustright \\fs%s\\cgrid \\snext0 Normal;}', num_n.font_size * 2),
+  #   '{\\*\\cs10 \\additive Default Paragraph Font;}}',
+  #   str_s.headers,
+  #   str_s.footers
+  # )
   
   # Add Page Setup Strings
   str_s.rtf_content_header <- c(str_s.rtf_content_header, 
@@ -243,10 +289,12 @@ ru_write2rtf <- function(
   }
 
   if (str_s.outType == "GT") {
-    str_s.body_lines <- NULL
+    this_gt_tbl <- NULL
+    str_s.rtf_content <- NULL
     for (i in seq_along(gt_tbl)) {
+      str_s.body_lines <- NULL
     # for (i in 1:1) {
-      gt_tbl[[i]] <- gt_tbl[[i]] %>%
+      this_gt_tbl[[i]] <- gt_tbl[[i]] %>%
         gt::text_transform(
           fn = function(x) gsub("\n", str_s.line_break, x)
         ) %>%
@@ -254,49 +302,51 @@ ru_write2rtf <- function(
           locations = gt::cells_column_labels(),
           fn = function(x) gsub("\n", str_s.line_break, x)
         )
-      # gt_tbl[[i]] <- gt_tbl[[i]] %>%  
-      #   gt::text_transform(
-      #     fn = function(x) gsub("\n", str_s.line_break, gsub(" ", str_s.hold_space, x))
-      #   ) %>%
-      #   gt::text_transform(
-      #     locations = gt::cells_column_labels(),
-      #     fn = function(x) gsub("\n", str_s.line_break, gsub(" ", str_s.hold_space, x))
-      #   ) 
+
+      # Can't use gt::gt_group(). gt_group() RTF output will add an extra line at the top
+      # of the page after first page. 
+      gt::gtsave(this_gt_tbl[[i]], outfile)
+      str_s.body_lines <- base::readLines(outfile)
       
-      str_s.this_body_lines <- utils::capture.output(base::cat(as.character(gt::as_rtf(gt_tbl[[i]]))))
+      # as_rtf doesn't work the same way as gtsave on that the line break character is converted to "\n" 
+      # in output from as_rtf. 
+      # str_s.body_lines <- utils::capture.output(base::cat(as.character(gt::as_rtf(gt_tbl[[i]]))))
       
-      k <- base::grep("\\\\trowd", str_s.this_body_lines)[1]
+      k <- base::grep("\\\\trowd", str_s.body_lines)[1]
       if (!is.na(k)) {
-        str_s.this_body_lines <- c("{", str_s.this_body_lines[k:length(str_s.this_body_lines)])
+        str_s.body_lines <- str_s.body_lines[k:length(str_s.body_lines)]
       }
       
-      if (is.null(str_s.body_lines)) str_s.body_lines <- str_s.this_body_lines else
-        str_s.body_lines <- c(str_s.body_lines, "\\page", str_s.this_body_lines)
-    }      
+      str_s.body_lines <- gsub(str_s.hold_space_rtf, " ", str_s.body_lines)
+      str_s.body_lines <- gsub("\\\\sectd", "\\\\landscape\\\\sectd", str_s.body_lines) 
+      str_s.body_lines <- gsub("\\\\clpadt\\d+", "\\\\clpadt0", str_s.body_lines)
+      str_s.body_lines <- gsub("\\\\clpadb\\d+", "\\\\clpadb0", str_s.body_lines)
+      # str_s.body_lines <- gsub("\\\\clpadb\\d+", "\\\\clpadb0", str_s.body_lines)
+      str_s.body_lines <- gsub("\\\\clpadl\\d+", "\\\\clpadl0", str_s.body_lines) 
+      str_s.body_lines <- gsub("\\\\clpadr\\d+", "\\\\clpadr0", str_s.body_lines) 
+      str_s.body_lines <- gsub("\\\\clpadft\\d+", "\\\\clpadtf0", str_s.body_lines)
+      str_s.body_lines <- gsub("\\\\clpadfb\\d+", "\\\\clpadbf0", str_s.body_lines)   
+      str_s.body_lines <- gsub("\\\\clpadfl\\d+", "\\\\clpadlf0", str_s.body_lines) 
+      str_s.body_lines <- gsub("\\\\clpadfr\\d+", "\\\\clpadrf0", str_s.body_lines)  
+      str_s.body_lines <- gsub("\\\\qc", "\\\\ql", str_s.body_lines)  
+      str_s.body_lines <- gsub("\\\\fs\\d+", sprintf("\\\\fs%s", num_n.font_size * 2), str_s.body_lines)
+      if (!is.null(titlelinebreakchar)) str_s.body_lines <- gsub(titlelinebreakchar, "\\\\par ", str_s.body_lines)
+      if (!is.null(str_s.line_break)) str_s.body_lines <- gsub(str_s.line_break, "\\\\par ", str_s.body_lines)
+      str_s.body_lines <- gsub("\\\\f\\d+", "\\\\f2", str_s.body_lines)
+      str_s.body_lines <- gsub("(\\\\pard.* )", sprintf("\\1\\\\sl-%s\\\\slmult0\\\\widctlpar\\\\adjustright", num_n.space),  str_s.body_lines)
+      
+      # str_s.body_lines <- gsub("\\\\trrh0", paste0("\\\\trrh", num_n.font_size * 1.25 * 20), str_s.body_lines)
+      # str_s.body_lines <- gsub("\\\\pard", paste0("\\\\pard\\\\sl-", num_n.font_size * 20, "\\\\slmult0"), str_s.body_lines)
+      # str_s.body_lines <- gsub("\\\\clvertalc", "\\\\clvertalt", str_s.body_lines)  
 
-    str_s.body_lines <- gsub(str_s.hold_space_rtf, " ", str_s.body_lines)
-    str_s.body_lines <- gsub("\\\\sectd", "\\\\landscape\\\\sectd", str_s.body_lines) 
-    str_s.body_lines <- gsub("\\\\clpadt\\d+", "\\\\clpadt0", str_s.body_lines)
-    str_s.body_lines <- gsub("\\\\clpadb\\d+", "\\\\clpadb0", str_s.body_lines)
-    str_s.body_lines <- gsub("\\\\clpadl\\d+", "\\\\clpadl0", str_s.body_lines) 
-    str_s.body_lines <- gsub("\\\\clpadr\\d+", "\\\\clpadr0", str_s.body_lines) 
-    str_s.body_lines <- gsub("\\\\clpadft\\d+", "\\\\clpadtf0", str_s.body_lines)
-    str_s.body_lines <- gsub("\\\\clpadfb\\d+", "\\\\clpadbf0", str_s.body_lines)   
-    str_s.body_lines <- gsub("\\\\clpadfl\\d+", "\\\\clpadlf0", str_s.body_lines) 
-    str_s.body_lines <- gsub("\\\\clpadfr\\d+", "\\\\clpadrf0", str_s.body_lines)  
-    str_s.body_lines <- gsub("\\\\qc", "\\\\ql", str_s.body_lines)  
-    if (!is.null(titlelinebreakchar)) str_s.body_lines <- gsub(titlelinebreakchar, "\\\\par ", str_s.body_lines)
-    if (!is.null(str_s.line_break)) str_s.body_lines <- gsub(str_s.line_break, "\\\\par ", str_s.body_lines)
-    str_s.body_lines <- gsub("\\\\f\\d+", "\\\\f2", str_s.body_lines)
-    str_s.body_lines <- gsub("(\\\\pard.* )", sprintf("\\1\\\\sl-%s\\\\slmult0\\\\widctlpar\\\\adjustright", num_n.space),  str_s.body_lines)
+      if (i == 1) str_s.body_lines[1] <- paste0("{", str_s.body_lines[1]) else
+        str_s.body_lines <- c(str_s.rtf_table_break_lines, str_s.body_lines)
+      
+      str_s.rtf_content <- c(str_s.rtf_content, str_s.body_lines)
+    }
 
-    # str_s.body_lines <- gsub("\\\\trrh0", paste0("\\\\trrh", num_n.font_size * 1.25 * 20), str_s.body_lines)
-    # str_s.body_lines <- gsub("\\\\pard", paste0("\\\\pard\\\\sl-", num_n.font_size * 20, "\\\\slmult0"), str_s.body_lines)
-    # str_s.body_lines <- gsub("\\\\clvertalc", "\\\\clvertalt", str_s.body_lines)    
-    
-    str_s.rtf_content <- c(str_s.rtf_content_header, str_s.body_lines)
-    str_s.rtf_content <- c(str_s.rtf_content, "}")
-    writeLines(str_s.rtf_content, con = outfile) 
+    str_s.rtf_content <- c(str_s.rtf_content_header, str_s.rtf_content, "}")
+    writeLines(str_s.rtf_content, con = outfile)
   } else if (str_s.outType == "TEXT") {
     str_s.rtf_content_header <- c(str_s.rtf_content_header, 
                                 sprintf("\\pard\\plain \\sl-%s\\slmult0\\widctlpar\\adjustright \\fs%s\\cgrid {\\f2\\fs%s%s", 
@@ -341,21 +391,21 @@ ru_write2rtf <- function(
     str_s.body_lines <- NULL
     for (i in seq_along(gt_tbl)) {
       if (i > 1) str_s.body_lines <- c(str_s.body_lines, "\\page")
-      num_n.n.g_width <- round((num_n.page_width - num_n.lmargin - num_n.rmargin) * 72, 0)
-      num_n.n.g_height <- round((num_n.page_height - num_n.tmargin - num_n.bmargin) * 72 , 0) - num_n.n.headerheight - num_n.n.footerheight
+      num_n.g_width <- round((num_n.page_width - num_n.lmargin - num_n.rmargin) * 72, 0)
+      num_n.g_height <- round((num_n.page_height - num_n.tmargin - num_n.bmargin) * 72 , 0) - num_n.headerheight - num_n.footerheight
       num_n.panel_left_col <- NULL
       num_n.panel_right_col <- NULL
-      for (i in 1:seq_along(gt_tbl)) {
+      for (i in seq_along(gt_tbl)) {
         num_n.panel_left_col[i] <- 0
         num_n.panel_right_col[i] <- 0
       }
       
       this_img_file <- paste0(str_s.outdir, "/", str_s.outfile, "___", i, ".png")
       # str_s.wrapper_body_end <- c(paste0("\\label{fig:plot", "", i, "}"), "\\end{figure}")
-      ggplot2::ggsave(this_img_file, gt_tbl[[i]], height = base::ceiling(num_n.n.g_height * 300/72), dpi=300,
-                      width = base::ceiling((num_n.n.g_width - num_n.panel_right_col[i] - num_n.panel_left_col[i]) * 300/72),
-                      # height = base::ceiling(num_n.n.g_height * 300/72),
-                      units = "px", scale=base::round((num_n.page_height/num_n.page_width)/(num_n.n.g_height/num_n.n.g_width), 2))
+      ggplot2::ggsave(this_img_file, gt_tbl[[i]], height = base::ceiling((num_n.g_height * 300/72)/scale), dpi=300,
+                      width = base::ceiling((num_n.g_width - num_n.panel_right_col[i] - num_n.panel_left_col[i]) * 300/72),
+                      # height = base::ceiling(num_n.g_height * 300/72),
+                      units = "px", scale=scale)
       
       str_s.raw_data <- base::readBin(this_img_file, what = "raw", n = base::file.info(this_img_file)$size)
       # Convert bytes to a single long hexadecimal string
@@ -363,8 +413,8 @@ ru_write2rtf <- function(
       
       str_s.body_lines <- c(str_s.body_lines,
         sprintf("{\\pard\\qc {\\pict\\pngblip\\picwgoal%d\\pichgoal%d",
-                (num_n.n.g_width - num_n.panel_right_col[i] - num_n.panel_left_col[i]) * 20, 
-                num_n.n.g_height * 20), 
+                round((num_n.g_width - num_n.panel_right_col[i] - num_n.panel_left_col[i]) * 20 * scale, 0), 
+                num_n.g_height * 20), 
         str_s.hex_string,
         "} \\par}"
       )
@@ -384,5 +434,4 @@ ru_write2rtf <- function(
   
   return(invisible())
 }
-
 
