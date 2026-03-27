@@ -54,7 +54,9 @@ ru_format_dataframe <- function(dsetin, col_formats = NULL, na_str = "") {
     fmt <- user_fmt %||% input_fmt %||% default_formats[[cls]] %||% default_formats$default
     
     # Apply formatting by class
-    if (cls %in% c("numeric", "double", "integer")) {
+    if (cls %in% c("numeric") & is.null(user_fmt)) {
+      str_s.out <- ifelse(is.na(x), na_str, as.character(x))
+    } else if (cls %in% c("numeric", "double", "integer")) {
       str_s.out <- ifelse(is.na(x), na_str, sprintf(fmt, x))
     } else if (cls == "logical") {
       str_s.out <- ifelse(is.na(x), na_str, sprintf(fmt, ifelse(x, "Y", "N")))
