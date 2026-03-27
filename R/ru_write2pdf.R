@@ -26,6 +26,7 @@ ru_write2pdf <- function(
   titlelinebreakchar="\a",
   titleblanku8char="\u0A00",
   marginsininch=c("top"=1.25, "bottom"=1, "left"=1, "right"=1),
+  scale=1,
   fontname=c("DejaVuSansMono", "Courier New")
   ) {
   
@@ -55,12 +56,12 @@ ru_write2pdf <- function(
   if (is.character(inobj)) str_s.outType <- "TEXT" else
     if (base::inherits(inobj, c("patch", "patchwork", "ggplot", "gg"))) {
       str_s.outType <- "GG" 
-      gt_tbl <- list(inobj)
+      this_gt_tbl <- list(inobj)
     } else if (base::inherits(inobj, c("gt", "gt_tbl"))) {
-      gt_tbl <- list(inobj)
+      this_gt_tbl <- list(inobj)
       str_s.outType <- "GT"
     } else if (is.list(inobj)) {
-        gt_tbl <- inobj 
+        this_gt_tbl <- inobj 
         if (base::inherits(inobj[[1]], c("patch", "patchwork", "ggplot", "gg"))) str_s.outType <- "GG"
         if (base::inherits(inobj[[1]], c("gt", "gt_tbl"))) str_s.outType <- "GT"
     }
@@ -105,25 +106,23 @@ ru_write2pdf <- function(
     str_s.orientation="landscape"
     num_n.page_height <- 8.5
     num_n.page_width <- 11    
-    str_s.dtype <- "TXT"
   } else if (base::substr(str_s.ext_t, 1, 1) == "P") {
     str_s.orientation="portrait"
     num_n.page_height <- 11
     num_n.page_width <- 8.5
-    str_s.dtype <- "TXT"
   } else {
     str_s.orientation="landscape"
     num_n.page_height <- 11
     num_n.page_width <- 8.5
-    str_s.dtype <- str_s.ext
   }
   
-  list_l.lsmvar <- list("P08"=90, "P09"=80, "P10"=72, "P11"=65, "P12"=64 , "L08"=135, "L09"=120, "L10"=108, "L11"=98, "L12"=90)
-  list_l.psmvar <- list("P08"=83, "P09"=74, "P10"=67, "P11"=61, "P12"=56 , "L08"=54,  "L09"=48,  "L10"=43,  "L11"=39, "L12"=36)
-  num_n.linesize <- unlist(list_l.lsmvar[str_s.ext_t])
-  num_n.pagesize <- unlist(list_l.psmvar[str_s.ext_t])
+  num_n.numofpages <- if (str_s.outType == "TEXT") base::sum(stringr::str_count(inobj, "\f")) + 1 else length(this_gt_tbl)
   
-  num_n.numofpages <- if (str_s.outType == "TEXT") base::sum(stringr::str_count(inobj, "\f")) + 1 else length(gt_tbl)
+  # margins with header and footer counted
+  num_n.font_size <- as.numeric(sub(".*?(\\d+).*", "\\1", str_s.ext_t))
+  
+  # if (str_s.outType == "TEXT") num_n.font_size_1  <- num_n.font_size * 1.045 else
+    num_n.font_size_1 <- num_n.font_size 
   
   # headers
   str_s.leftheaders <- if ("left" %in% names(headers)) unlist(headers[["left"]]) else ""
@@ -152,9 +151,12 @@ ru_write2pdf <- function(
   if (length(str_s.centerheaders) > 1) str_s.centerheaders[-length(str_s.centerheaders)] <- paste0(str_s.centerheaders[-length(str_s.centerheaders)], " \\\\")
   
   str_s.headers <- NULL
-  if (length(str_s.leftheaders) > 1 || str_s.leftheaders[1] != "~") str_s.headers <- c(str_s.headers, "\\lhead{", str_s.leftheaders, "}")
-  if (length(str_s.rightheaders) > 1 || str_s.rightheaders[1] != "~") str_s.headers <- c(str_s.headers, "\\rhead{", str_s.rightheaders, "}")
-  if (length(str_s.centerheaders) > 1 || str_s.centerheaders[1] != "~") str_s.headers <- c(str_s.headers, "\\chead{", str_s.centerheaders, "}")
+  if (length(str_s.leftheaders) > 1 || str_s.leftheaders[1] != "~") {
+    str_s.headers <- c(str_s.headers, sprintf("\\lhead{\\fontsize{%spt}{%spt}\\selectfont", num_n.font_size_1, num_n.font_size_1), str_s.leftheaders, "}")}
+  if (length(str_s.rightheaders) > 1 || str_s.rightheaders[1] != "~") {
+    str_s.headers <- c(str_s.headers, sprintf("\\rhead{\\fontsize{%spt}{%spt}\\selectfont", num_n.font_size_1, num_n.font_size_1), str_s.rightheaders, "}")}
+  if (length(str_s.centerheaders) > 1 || str_s.centerheaders[1] != "~")  {
+    str_s.headers <- c(str_s.headers, sprintf("\\chead{\\fontsize{%spt}{%spt}\\selectfont", num_n.font_size_1, num_n.font_size_1), str_s.centerheaders, "}")}
   
   if (!is.null(str_s.headers)) str_s.headers <- base::gsub("pageof", paste0("Page \\arabic{page} of ", num_n.numofpages), str_s.headers, fixed = TRUE)
   
@@ -185,17 +187,15 @@ ru_write2pdf <- function(
   if (length(str_s.centerfooters)  > 1) str_s.centerfooters[-length(str_s.centerfooters)] <- paste0(str_s.centerfooters[-length(str_s.centerfooters)], " \\\\")
   
   str_s.footers <- NULL
-  if (length(str_s.leftfooters) > 1 || str_s.leftfooters[1] != "~") str_s.footers <- c(str_s.footers, "\\lfoot{", str_s.leftfooters, "}")
-  if (length(str_s.rightfooters) > 1 || str_s.rightfooters[1] != "~") str_s.footers <- c(str_s.footers, "\\rfoot{", str_s.rightfooters, "}")
-  if (length(str_s.centerfooters) > 1 || str_s.centerfooters[1] != "~") str_s.footers <- c(str_s.footers, "\\cfoot{", str_s.centerfooters, "}")
+  if (length(str_s.leftfooters) > 1 || str_s.leftfooters[1] != "~") {
+    str_s.footers <- c(str_s.footers, sprintf("\\lfoot{\\fontsize{%spt}{%spt}\\selectfont", num_n.font_size_1, num_n.font_size_1), str_s.leftfooters, "}")}
+  if (length(str_s.rightfooters) > 1 || str_s.rightfooters[1] != "~") {
+    str_s.footers <- c(str_s.footers, sprintf("\\rfoot{\\fontsize{%spt}{%spt}\\selectfont", num_n.font_size_1, num_n.font_size_1), str_s.rightfooters, "}")}
+  if (length(str_s.centerfooters) > 1 || str_s.centerfooters[1] != "~") {
+    str_s.footers <- c(str_s.footers, sprintf("\\cfoot{\\fontsize{%spt}{%spt}\\selectfont", num_n.font_size_1, num_n.font_size_1), str_s.centerfooters, "}")}
   
   if (!is.null(str_s.footers)) str_s.footers <- base::gsub("pageof", paste0("Page \\arabic{page} of ", num_n.numofpages), str_s.footers, fixed = TRUE)
-  
-  # margins with header and footer counted
-  num_n.font_size <- as.numeric(sub(".*?(\\d+).*", "\\1", str_s.ext_t))
-  
-  if (str_s.outType == "TEXT") num_n.font_size_1  <- num_n.font_size * 1.045 else
-    num_n.font_size_1 <- num_n.font_size 
+
   
   # --- Build LaTeX wrapper content ---
   
@@ -244,7 +244,7 @@ ru_write2pdf <- function(
   }
 
   str_s.wrapper_header <- c(
-    sprintf("\\documentclass[%s]{article}", paste0(num_n.font_size, "pt")),
+    sprintf("\\documentclass[%s]{extarticle}", paste0(num_n.font_size, "pt")),
     "",
     str_s.this_margin,
     "\\usepackage{fontspec}",
@@ -252,6 +252,8 @@ ru_write2pdf <- function(
     "\\usepackage{array}",
     "\\usepackage{caption}",
     "\\usepackage{graphicx}",
+    sprintf("\\DeclareCaptionFont{my712pt}{\\fontsize{%s}{%s}\\selectfont}", num_n.font_size_1, num_n.font_size_1),
+    "\\captionsetup{font=my712pt}",
     str_s.fancy_header, 
     " ",
     sprintf("\\setmonofont{%s}", fontname[1]),
@@ -282,9 +284,9 @@ ru_write2pdf <- function(
   # Write to LaTex file
   if (str_s.outType == "GT") { 
     # Insert each gt LaTeX fragment with a page break
-    for (i in seq_along(gt_tbl)) {
+    for (i in seq_along(this_gt_tbl)) {
       # for (i in 1:2) {
-      gt_tbl[[i]] <- gt_tbl[[i]] %>%  
+      this_gt_tbl[[i]] <- this_gt_tbl[[i]] %>%  
         gt::text_transform(
           fn = function(x) gsub("\n", str_s.line_break, gsub(" ", str_s.hold_space, x))
         ) %>%
@@ -293,17 +295,19 @@ ru_write2pdf <- function(
           fn = function(x) gsub("\n", str_s.line_break, gsub(" ", str_s.hold_space, x))
         ) 
       
-      str_s.body_lines <- utils::capture.output(base::cat(as.character(gt::as_latex(gt_tbl[[i]]))))
+      str_s.body_lines <- utils::capture.output(base::cat(as.character(gt::as_latex(this_gt_tbl[[i]]))))
       # str_s.body_lines <- gsub(str_s.line_break2, "\\\\\\\\", str_s.body_lines)
       str_s.body_lines <- gsub(str_s.line_break2, " \\\\newline \\\\mbox{}", str_s.body_lines)
       str_s.body_lines <- gsub(str_s.line_break, " \\\\newline \\\\mbox{}", str_s.body_lines)
+      str_s.body_lines <- gsub("\\\\large\\s*", "", str_s.body_lines)
+      str_s.body_lines <- gsub("\\\\small\\s*", "", str_s.body_lines)
       str_s.body_lines <- stringr::str_replace_all(str_s.body_lines, paste0("\\{(", str_s.hold_space, ")+\\}"), "{}")
       str_s.body_lines <- stringr::str_replace_all(str_s.body_lines, paste0("\\{(", str_s.hold_space, ")+"),
                                           function(m) paste0("{", base::strrep("~", (nchar(m)-1)/nchar(str_s.hold_space))))
       str_s.body_lines <- stringr::str_replace_all(str_s.body_lines, paste0("(", str_s.hold_space, ")+"),
                                           function(m) base::strrep("~", nchar(m)/nchar(str_s.hold_space)))
       str_s.body_lines <- stringr::str_replace_all(str_s.body_lines, "\\\\raggedright", " \\\\relax")
-      str_s.body_lines <- gsub("\\\\large\\s*", "", str_s.body_lines)
+
       # str_s.body_lines <- gsub("\\\\begin\\{minipage\\}\\{", "\\\\begin{minipage}[t]\\{", str_s.body_lines)
       
       # This regex finds ANY fontsize command and replaces it with your flexible variables
@@ -316,7 +320,10 @@ ru_write2pdf <- function(
       # Remove the extra space added by booktabs
       str_s.body_lines <- gsub("\\\\addlinespace\\[.*\\]", "", str_s.body_lines)
       
-      if (i == 1) str_s.wrapper <- str_s.wrapper_header else str_s.wrapper <- c(str_s.wrapper, "\\newpage")
+      if (i == 1) str_s.wrapper <- str_s.wrapper_header else {
+        if (i/20 == base::floor(i/20)) str_s.wrapper <- c(str_s.wrapper, "\\clearpage", "\\newpage") else
+          str_s.wrapper <- c(str_s.wrapper, "\\newpage")
+      }
       str_s.wrapper <- c(str_s.wrapper, str_s.body_lines)
     }
     
@@ -342,28 +349,27 @@ ru_write2pdf <- function(
     num_n.g_height <- round((num_n.page_height - num_n.tmargin - num_n.bmargin) * 72 , 0) - num_n.headerheight - num_n.footerheight
     num_n.panel_left_col <- NULL
     num_n.panel_right_col <- NULL
-    for (i in 1:seq_along(gt_tbl)) {
+    for (i in seq_along(this_gt_tbl)) {
       num_n.panel_left_col[i] <- 0
       num_n.panel_right_col[i] <- 0
     }
-    # str_s.wrapper_body_start <- c("\\begin{figure}[b]", "\\centering", "\\vspace{-10pt}")
-    # str_s.wrapper_body_end <- c("\\vspace{-10pt}", "\\end{figure}")
     str_s.wrapper_body_start <- c("\\begin{figure}", "\\centering")
     str_s.wrapper_body_end <- "\\end{figure}"  
     str_s.wrapper_end <- "\\end{document}"
-    for (i in seq_along(gt_tbl)) {
+    str_s.wrapper_bodys <- NULL
+    for (i in seq_along(this_gt_tbl)) {
       this_img_file <- paste0(str_s.outdir, "/", str_s.outfile, "___", i, ".png")
-      # str_s.wrapper_body_end <- c(paste0("\\label{fig:plot", "", i, "}"), "\\end{figure}")
-      # print(c(num_n.g_height/72, num_n.g_width/72))
-      ggplot2::ggsave(this_img_file, gt_tbl[[i]], height = base::ceiling(num_n.g_height * 300/72), dpi=300,
+      ggplot2::ggsave(this_img_file, this_gt_tbl[[i]], height = base::ceiling((num_n.g_height * 300/72)/scale), dpi=300,
                       width = base::ceiling((num_n.g_width - num_n.panel_right_col[i] - num_n.panel_left_col[i]) * 300/72),
-                      # height = base::ceiling(num_n.g_height * 300/72),
-                      units = "px", scale=base::round((num_n.page_height/num_n.page_width)/(num_n.g_height/num_n.g_width), 2))
-      
-      str_s.wrapper_body <- paste0("\\includegraphics[width=1\\textwidth]{", this_img_file, "}")
-      if (i > 1) str_s.wrapper_body <- c("\\newpage", str_s.wrapper_body)
-      writeLines(c(str_s.wrapper_header, str_s.wrapper_body_start, str_s.wrapper_body, str_s.wrapper_body_end, str_s.wrapper_end), str_s.tex_wrapper_file)
+                      units = "px", scale=scale)
+      str_s.wrapper_body <- c(str_s.wrapper_body_start, 
+                              base::sprintf("\\includegraphics[width=%s\\textwidth, keepaspectratio]{%s}", scale, this_img_file),
+                              str_s.wrapper_body_end
+      )
+      if (i > 1) str_s.wrapper_bodys <- c(str_s.wrapper_bodys, "\\par", str_s.wrapper_body) else 
+        str_s.wrapper_bodys <- str_s.wrapper_body
     }
+    writeLines(c(str_s.wrapper_header, str_s.wrapper_bodys, str_s.wrapper_end), str_s.tex_wrapper_file)
   }
   
   # --- Compile PDF ---
@@ -377,12 +383,11 @@ ru_write2pdf <- function(
   }
   
   # Remove output .tex, .log and .aux file
-  base::unlink(base::paste0(str_s.outdir, "/", str_s.outfile, ".tex"))
+  # base::unlink(base::paste0(str_s.outdir, "/", str_s.outfile, ".tex"))
   base::unlink(base::paste0(str_s.outdir, "/", str_s.outfile, ".aux"))
   base::unlink(base::paste0(str_s.outdir, "/", str_s.outfile, ".log"))
-  if (str_s.outType == "GG") for (i in seq_along(gt_tbl)) {
+  if (str_s.outType == "GG") for (i in seq_along(this_gt_tbl)) {
     base::unlink(paste0(str_s.outdir, "/", str_s.outfile, "___", i, ".png"))
   }
   return(invisible())
 }
-
