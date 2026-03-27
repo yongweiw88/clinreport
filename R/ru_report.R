@@ -22,7 +22,7 @@
 #' @param nowidowvar Not in version 1
 #' @param sharecolvars Order variables that share print space.
 #' @param sharecolvarsindent Indentation factor
-#' @param overallsummary Overall summary line at top of tables
+#' @param overallsummarylevel Overall summary line at top of tables
 #' @param proptions PROC REPORT statement options
 #' @param linesizeadjust Lines which will be added to line size.
 #' @param pagesizeadjust Lines which will be added to page size
@@ -60,7 +60,7 @@ ru_report <- function(
     sharecolvarsindent=2,
     computebeforepagevars=NULL,
     computebeforepagelines=NULL,
-    overallsummary=FALSE,
+    overallsummarylevel=0,
     proptions=c("noheadline", "noheadskip"),
     fontsize=c(rfenv$G_FONTSIZE, "L10", "L09", "L08", "L07", "L11", "L12", "P10", "P09", "P08", "P07", "P11", "P12"),
     headers=list("left"=c(paste0("Protocol: ", rfenv$G_STUDY_DESC), paste0("Population: ", rfenv$G_POPLBL)),
@@ -70,6 +70,7 @@ ru_report <- function(
     titles=c(paste(c("L"="Listing", "T"="Table", "F"="Figure")["T"], rfenv$G_DSPLYNUM), rfenv$G_TITLE1, rfenv$G_TITLE2, rfenv$G_TITLE3, rfenv$G_TITLE4, rfenv$G_TITLE5, rfenv$G_TITLE6, rfenv$G_TITLE7),
     titlelinebreakchar="\a",
     titleblanku8char="\u0A00",
+    marginsininch=c("top"=1.25, "bottom"=1, "left"=1, "right"=1),
     linesizeadjust=0,
     pagesizeadjust=0
 ) {
@@ -78,13 +79,11 @@ ru_report <- function(
   
   nodatatoreporttext <- "No data to report"
 
-  num_n.tmargin <- 1.25
-  num_n.bmargin <- 1
-  num_n.lmargin <- 1
-  num_n.rmargin <- 1
-  
-  list_l.lsmvar <- list("P08"=90, "P09"=80, "P10"=72, "P11"=65, "P12"=64 , "L08"=135, "L09"=120, "L10"=108, "L11"=98, "L12"=90)
-  list_l.psmvar <- list("P08"=83, "P09"=74, "P10"=67, "P11"=61, "P12"=56 , "L08"=54,  "L09"=48,  "L10"=43,  "L11"=39, "L12"=36)
+  if (overallsummarylevel > length(sharecolvars) - 1) overallsummarylevel <- length(sharecolvars) - 1 
+  num_n.tmargin <- base::ifelse("top" %in% names(marginsininch), marginsininch["top"], 1.25)
+  num_n.bmargin <- base::ifelse("bottom" %in% names(marginsininch), marginsininch["bottom"], 1)
+  num_n.lmargin <- base::ifelse("left" %in% names(marginsininch), marginsininch["left"], 1)
+  num_n.rmargin <- base::ifelse("right" %in% names(marginsininch), marginsininch["right"], 1)
   
   # print(paste0("ru_report: Get Line size and page size"))
   if (toupper(fontsize[1]) %in% c("L07", "L08", "L09", "L10", "L11", "L12", "P07", "P08", "P09", "P10", "P11", "P12")) {
@@ -103,30 +102,40 @@ ru_report <- function(
   
   # print(paste0("ru_report: Orientation"))
   if (base::substr(str_s.ext_t, 1, 1) == "L") {
-    s.orientation="landscape"
+    str_s.orientation="landscape"
     num_n.page_height <- 8.5
     num_n.page_width <- 11    
   } else if (base::substr(str_s.ext_t, 1, 1) == "P") {
-    s.orientation="portrait"
+    str_s.orientation="portrait"
     num_n.page_height <- 11
     num_n.page_width <- 8.5
   } else {
-    s.orientation="landscape"
+    str_s.orientation="landscape"
     num_n.page_height <- 11
     num_n.page_width <- 8.5
   }
   
-  num_n.fontsize <- as.numeric(sub(".*?(\\d+).*", "\\1", str_s.ext_t))
-
-  num_n.linesize <- unlist(list_l.lsmvar[str_s.ext_t])
-  num_n.pagesize <- unlist(list_l.psmvar[str_s.ext_t])
+  num_n.font_size <- as.numeric(sub(".*?(\\d+).*", "\\1", str_s.ext_t))
+  
+  # list_l.lsmvar <- list("P08"=90, "P09"=80, "P10"=72, "P11"=65, "P12"=64 , "L08"=135, "L09"=120, "L10"=108, "L11"=98, "L12"=90)
+  # list_l.psmvar <- list("P08"=83, "P09"=74, "P10"=67, "P11"=61, "P12"=56 , "L08"=54,  "L09"=48,  "L10"=43,  "L11"=39, "L12"=36)
+  # num_n.linesize <- unlist(list_l.lsmvar[str_s.ext_t])
+  # num_n.pagesize <- unlist(list_l.psmvar[str_s.ext_t])
+  
+  num_n.linesize <- round(((num_n.page_width - num_n.lmargin - num_n.rmargin)/((num_n.font_size * 0.6)/72)), 0)
+  # num_n.pagesize <- round(((num_n.page_height - num_n.tmargin - num_n.bmargin)/((num_n.font_size * 1.05)/72)), 0)
+  num_n.pagesize <- floor(((num_n.page_height - num_n.tmargin - num_n.bmargin)/((num_n.font_size * 1.07)/72)))
+  
+  # print(c(str_s.ext_t, str_s.orientation, num_n.font_size, num_n.linesize, num_n.pagesize))
+  # print(c(num_n.page_width, num_n.page_height, num_n.lmargin, num_n.rmargin, num_n.tmargin, num_n.bmargin))
+  
   str_s.hold_space <- titleblanku8char # character to replace " " in titles, headers and footnotes to keep alignment.
 
   num_n.linesize <- num_n.linesize + linesizeadjust
 
   str_s.padding_default <- "0pt"
-  str_s.fontsize_default <- paste0(num_n.fontsize, "pt")
-
+  str_s.fontsize_default <- paste0(num_n.font_size, "pt")
+  # print(c(str_s.fontsize_default, num_n.font_size))
   #
   # With this two options, column label upper and lower borders are hidden for RTF. but doesn't work for PDF.
   # 
@@ -323,7 +332,7 @@ ru_report <- function(
     ihtml.page_size_values = NULL,
     ihtml.pagination_type = NULL,
     ihtml.height = NULL,
-    page.orientation = s.orientation,
+    page.orientation = str_s.orientation,
     page.numbering = NULL,
     page.header.use_tbl_headings = NULL,
     page.footer.use_tbl_notes = NULL,
@@ -390,7 +399,7 @@ ru_report <- function(
     if (effective_width <= 0) stop("Indent is larger than or equal to total width.")
     
     lines <- list()
-    remainder <- text
+    remainder <-  base::trimws(text, which = "both")
     
     # 1. Wrap Logic using Substring
     while (nchar(remainder) > 0) {
@@ -536,49 +545,50 @@ ru_report <- function(
   df_dsetin <- ru_format_dataframe(df_dsetin, col_formats = formats, na_str = "")
   df_dsetin <- ru_labels(df_dsetin, varlabels=str_s.var_labels)
   
+  # str_s.columns_1 <- base::setdiff(str_s.columns_all, base::setdiff(noprintvars, sharecolvars))
   str_s.columns <- NULL
   num_n.sharecolvars <- 0
   str_s.sharecols <- NULL
   # derive columns in table by removing non-print columns and shared columns
   for (i in 1:length(str_s.columns_all)) {
-    s.name <-str_s.columns_all[i]
-    if (s.name %in% sharecolvars && num_n.sharecolvars < length(sharecolvars) - 1) {
+    str_s.name <-str_s.columns_all[i]
+    if (str_s.name %in% sharecolvars && num_n.sharecolvars < length(sharecolvars) - 1) {
       num_n.sharecolvars <- num_n.sharecolvars + 1
-      if (is.null(str_s.sharecols)) str_s.sharecols <- s.name
-      else str_s.sharecols <- c(str_s.sharecols, s.name)
-    } else if (! (s.name %in% noprintvars)) {
-      if ( ! (s.name %in% sharecolvars && num_n.sharecolvars >= length(sharecolvars))) {
-        if (is.null(str_s.columns)) str_s.columns <- s.name else 
-          str_s.columns <- c(str_s.columns, s.name)
+      if (is.null(str_s.sharecols)) str_s.sharecols <- str_s.name
+      else str_s.sharecols <- c(str_s.sharecols, str_s.name)
+    } else if (! (str_s.name %in% noprintvars)) {
+      if ( ! (str_s.name %in% sharecolvars && num_n.sharecolvars >= length(sharecolvars))) {
+        if (is.null(str_s.columns)) str_s.columns <- str_s.name else 
+          str_s.columns <- c(str_s.columns, str_s.name)
       }
     }
   }
   
   # derive columns in table by removing nonprint columns
-  s.rptcolumns <- sharecolvars
+  str_s.rptcolumns <- sharecolvars
   for (i in 1:length(str_s.columns_all)) {
-    s.name <- str_s.columns_all[i]
-    if (! (s.name %in% noprintvars) && ! s.name %in% sharecolvars) {
-      if (length(s.rptcolumns) == 0) s.rptcolumns <- s.name
-      else s.rptcolumns <- c(s.rptcolumns, s.name)
+    str_s.name <- str_s.columns_all[i]
+    if (! (str_s.name %in% noprintvars) && ! str_s.name %in% sharecolvars) {
+      if (length(str_s.rptcolumns) == 0) str_s.rptcolumns <- str_s.name
+      else str_s.rptcolumns <- c(str_s.rptcolumns, str_s.name)
     }
   }
   
   # print(paste0("ru_report: Get Widths"))
   # print(str_s.columns)
-  if (length(str_s.columns) > length(widths)) str_s.col_widths <-  c(widths, rep(15, length(str_s.columns) - length(widths))) else
-    str_s.col_widths <- widths
+  if (length(str_s.columns) > length(widths)) num_n.col_char_widths <-  c(widths, rep(15, length(str_s.columns) - length(widths))) else
+    num_n.col_char_widths <- widths
   
-  # if (length(str_s.columns_all) > length(widths)) str_s.col_widths <-  c(widths, rep(15, length(str_s.columns_all) - length(widths))) else
-  #   str_s.col_widths <- widths
-  names(str_s.col_widths) <- str_s.columns
+  # if (length(str_s.columns_all) > length(widths)) num_n.col_char_widths <-  c(widths, rep(15, length(str_s.columns_all) - length(widths))) else
+  #   num_n.col_char_widths <- widths
+  names(num_n.col_char_widths) <- str_s.columns
 
   if (length(str_s.sharecols) > 0) { 
-    if (! (sharecolvars[length(sharecolvars)] %in% names(str_s.col_widths))) {
-      str_s.col_widths[sharecolvars[length(sharecolvars)]] <- str_s.col_widths[sharecolvars[length(sharecolvars)]] + (length(sharecolvars) - 1) * sharecolvarsindent
+    if (! (sharecolvars[length(sharecolvars)] %in% names(num_n.col_char_widths))) {
+      num_n.col_char_widths[sharecolvars[length(sharecolvars)]] <- num_n.col_char_widths[sharecolvars[length(sharecolvars)]] + (length(sharecolvars) - 1) * sharecolvarsindent
     }
     for (i in 1:length(str_s.sharecols)) {
-      str_s.col_widths[str_s.sharecols[i]] <- str_s.col_widths[sharecolvars[length(sharecolvars)]]
+      num_n.col_char_widths[str_s.sharecols[i]] <- num_n.col_char_widths[sharecolvars[length(sharecolvars)]]
       noprintvars <- c(noprintvars, str_s.sharecols)
     }
   }
@@ -608,14 +618,15 @@ ru_report <- function(
   if (length(sharecolvars) > 0) {
     for (i in 1:length(sharecolvars)) {
       str_s.thislabel <- base::attr(df_dsetin[[sharecolvars[i]]], "label")
-      str_s.thislabel <- stringr::str_wrap(str_s.thislabel, width = str_s.col_widths[sharecolvars[i]], 
+      if (is.null(str_s.thislabel)) str_s.thislabel <- ""
+      str_s.thislabel <- stringr::str_wrap(str_s.thislabel, width = num_n.col_char_widths[sharecolvars[i]], 
                                            indent = sharecolvarsindent * (i-1), exdent = (i - 1) * sharecolvarsindent, whitespace_only = TRUE)
       if (length(str_s.thislabel) > 0 && str_s.thislabel[1] != "") {
         if (is.null(str_s.sharecolvarlabel)) str_s.sharecolvarlabel <- str_s.thislabel else
           str_s.sharecolvarlabel <- paste0(str_s.sharecolvarlabel, "\n", str_s.thislabel)
       }
     }
-    base::attr(df_dsetin[[sharecolvars[-1]]], "label") <- str_s.sharecolvarlabel
+    base::attr(df_dsetin[[sharecolvars[length(sharecolvars)]]], "label") <- str_s.sharecolvarlabel
   } 
   
   str_l.wrap_labels <-list()
@@ -624,10 +635,12 @@ ru_report <- function(
     if (str_s.columns[i] %in% c(str_s.centrevars, centrevars)) str_s.this_align <- "center" else
       if (str_s.columns[i] %in% c(rightvars)) str_s.this_align <- "right"
       
-    str_s.thislabel_lines <- unlist(base::strsplit(base::attr(df_dsetin[[str_s.columns[i]]], "label"), "\n"))
+    str_s.thislabel_lines_1 <- base::attr(df_dsetin[[str_s.columns[i]]], "label")
+    if (is.null(str_s.thislabel_lines_1)) str_s.thislabel_lines_1 <- ""
+    str_s.thislabel_lines <- unlist(base::strsplit(str_s.thislabel_lines_1, "\n"))
     str_s.thislabel_lines_1 <- NULL
     for (n in 1:length(str_s.thislabel_lines)) {
-      str_s.thislabel_lines_2 <- wrap_align_indent(str_s.thislabel_lines[n], width= str_s.col_widths[str_s.columns[i]], align=str_s.this_align, indent=nchar(stringr::str_extract(str_s.thislabel_lines[n], "^\\s*")))
+      str_s.thislabel_lines_2 <- wrap_align_indent(str_s.thislabel_lines[n], width= num_n.col_char_widths[str_s.columns[i]], align=str_s.this_align, indent=nchar(stringr::str_extract(str_s.thislabel_lines[n], "^\\s*")))
 
       str_s.thislabel_lines_2 <- stringr::str_replace_all(str_s.thislabel_lines_2, " +$",  "")
       str_s.thislabel_lines_2 <- stringr::str_replace_all(str_s.thislabel_lines_2, " +\n",  "\n")
@@ -661,27 +674,28 @@ ru_report <- function(
     df_dsetin <- as.data.frame(dplyr::tibble(ggplot__ = c(base::rep(" ", !! num_n.pagesz))))
     df_dsetin[round((num_n.pagesz)/2, 0), "ggplot__"] <- nodatatoreporttext
     columns <- "ggplot__"
+    centrevars <- "ggplot__"
     widths <- num_n.linesize
   } 
   
   # print(paste0("ru_report: Wrap Column Values"))
   
   # 1. Pre-calculate column alignments to avoid repeated %in% checks
-  str_s.this_align <- setNames(rep("left", length(s.rptcolumns)), s.rptcolumns)
-  str_s.this_align[s.rptcolumns %in% str_s.centrevars] <- "center"
-  str_s.this_align[s.rptcolumns %in% rightvars] <- "right"
+  str_s.this_align <- setNames(rep("left", length(str_s.rptcolumns)), str_s.rptcolumns)
+  str_s.this_align[str_s.rptcolumns %in% str_s.centrevars] <- "center"
+  str_s.this_align[str_s.rptcolumns %in% rightvars] <- "right"
 
   # 2. Create a vectorized version of your custom function
   # This allows the function to take a vector of strings instead of one string
 
   # 3. Process by column (Vectorized)
-  for (col_name in s.rptcolumns) {
+  for (col_name in str_s.rptcolumns) {
     this_align <- str_s.this_align[col_name]
     df_col_data <- df_dsetin[[col_name]]
     
     # Determine indents for the whole column at once
     if (col_name %in% centrevars &&  ! col_name %in% str_s.centrevars) {
-      num_n.this_indent_extra <- base::max(0, base::floor((str_s.col_widths[col_name] - base::max(nchar(stringr::str_replace_all(df_col_data, "\\s+$", ""))))/2))
+      num_n.this_indent_extra <- base::max(0, base::floor((num_n.col_char_widths[col_name] - base::max(nchar(stringr::str_replace_all(df_col_data, "\\s+$", ""))))/2))
     } else {
       num_n.this_indent_extra <- 0
     }
@@ -699,7 +713,7 @@ ru_report <- function(
     # Apply the wrapping and line break substitution to the whole column
     df_formatted_col <- base::mapply(wrap_align_indent,
                                      df_col_data, 
-                                     width = str_s.col_widths[col_name], 
+                                     width = num_n.col_char_widths[col_name], 
                                      align = this_align, 
                                      indent = num_n.this_indents + num_n.this_indent_extra)
     
@@ -708,19 +722,46 @@ ru_report <- function(
   
   # 4. Calculate nlines__ for all rows at once
   # We only count lines for columns that are "visible"
-  visible_cols <- s.rptcolumns
+  str_s.visible_cols <- str_s.rptcolumns
   if (length(sharecolvars) > 0) {
     # Logic: bln_b.visib le is false if it's in sharecolvars but NOT the last index
     hidden_share_vars <- sharecolvars[-length(sharecolvars)]
-    visible_cols <- setdiff(s.rptcolumns, hidden_share_vars)
+    str_s.visible_cols <- setdiff(str_s.rptcolumns, hidden_share_vars)
   }
   
   # Use pmax to find the max line count across visible columns for each row
-  num_n.line_counts <- lapply(df_dsetin[visible_cols], function(column) {
+  list_l.line_counts <- lapply(df_dsetin[str_s.visible_cols], function(column) {
     stringr::str_count(column, stringr::fixed(str_s.line_break)) + 1
   })
   
-  df_dsetin$nlines__ <- do.call(base::pmax, num_n.line_counts)
+  df_dsetin$nlines__ <- do.call(base::pmax, list_l.line_counts)
+  
+  
+  # Ordervars for nowindowvar calcuation
+  str_s.visible_ordervars <- base::intersect(str_s.visible_cols, str_s.ordervars)
+  if (!is.null(nowidowvar)) {
+    df_dsetin_cat <- df_dsetin
+    if (!is.null(str_s.visible_ordervars)) {
+      for (i in nrow(df_dsetin)) {
+        for (j in (length(str_s.visible_ordervars)):1) {
+          num_n.n <- ru_index(str_s.columns_all == str_s.visible_ordervars[j])
+          bln_b.changed <- base::any(
+            df_dsetin[i, str_s.columns_all[num_n.n]] != df_dsetin[i - 1, str_s.columns_all[num_n.n]]
+          )
+          
+          if (!bln_b.changed) {
+            df_dsetin_cat[i, str_s.visible_ordervars[1:j]] <- " "
+            break
+          }
+        } 
+      }
+    }
+    list_l.line_counts_2 <- lapply(df_dsetin_cat[str_s.visible_cols], function(column) {
+      stringr::str_count(column, stringr::fixed(str_s.line_break)) + 1
+    })
+    
+    df_dsetin_cat$nlines__ <- do.call(base::pmax, as.data.frame(list_l.line_counts_2))
+  }
   
   str_s.skipvars <- skipvars
   if (! (length(skipvars) == 0 || length(nowidowvar) == 0)) {
@@ -740,224 +781,355 @@ ru_report <- function(
   
   # print(paste0("ru_report: Split columns into panels and keep idvars for each panel"))  
   
-  s.idvars <- idvars
-  if (length(intersect(s.idvars, sharecolvars)) > 0) s.idvars <- intersect(str_s.columns, unique(c(s.idvars, sharecolvars)))
+  str_s.idvars <- idvars
+  if (length(intersect(str_s.idvars, sharecolvars)) > 0) str_s.idvars <- intersect(str_s.columns, unique(c(str_s.idvars, sharecolvars)))
   
   str_s.this_cols <- NULL
   str_s.panel_cols <- NULL
-  num_n.panel_left_col <- NULL
-  num_n.panel_right_col <- NULL
+  num_n.panel_left_col_char_width <- NULL
+  num_n.panel_right_col_char_width <- NULL
+  num_n.panel_left_col_width <- NULL
+  num_n.panel_right_col_width <- NULL
   num_n.panels <- 1
-  num_n.this_length <- sum(str_s.col_widths[s.idvars]) + length(s.idvars) * colspacing
-  for (str_s.this_col in setdiff(str_s.columns, s.idvars)) {
-    # print(c(num_n.this_length, str_s.col_widths[str_s.this_col], num_n.this_length + str_s.col_widths[str_s.this_col]))
+  num_n.this_length <- sum(num_n.col_char_widths[str_s.idvars]) + length(str_s.idvars) * colspacing
+  for (str_s.this_col in setdiff(str_s.columns, str_s.idvars)) {
+    # print(c(num_n.this_length, num_n.col_char_widths[str_s.this_col], num_n.this_length + num_n.col_char_widths[str_s.this_col]))
     if (is.null(str_s.this_cols)) str_s.this_cols <- str_s.this_col 
-    if (num_n.this_length + str_s.col_widths[str_s.this_col] <= num_n.linesize) {
+    if (num_n.this_length + num_n.col_char_widths[str_s.this_col] <= num_n.linesize) {
       str_s.this_cols <- c(str_s.this_cols, str_s.this_col)
-      num_n.this_length <- num_n.this_length + str_s.col_widths[str_s.this_col] + colspacing
+      num_n.this_length <- num_n.this_length + num_n.col_char_widths[str_s.this_col] + colspacing
+      # print(c(str_s.this_cols, num_n.this_length))
     } else {
-      num_n.panel_left_col[num_n.panels] <- round((num_n.linesize - num_n.this_length)/2, 0)
-      num_n.panel_right_col[num_n.panels] <- num_n.linesize - num_n.this_length - num_n.panel_left_col[num_n.panels]
-      if (num_n.panel_right_col[num_n.panels] < 0) num_n.panel_right_col[num_n.panels] <- 0
-      if (num_n.panel_left_col[num_n.panels] < 0) num_n.panel_left_col[num_n.panels] <- 0
+      num_n.panel_left_col_char_width[num_n.panels] <- round((num_n.linesize - num_n.this_length)/2, 0)
+      num_n.panel_right_col_char_width[num_n.panels] <- num_n.linesize - num_n.this_length - num_n.panel_left_col_char_width[num_n.panels]
+      if (num_n.panel_right_col_char_width[num_n.panels] < 0) num_n.panel_right_col_char_width[num_n.panels] <- 0
+      if (num_n.panel_left_col_char_width[num_n.panels] < 0) num_n.panel_left_col_char_width[num_n.panels] <- 0
       
-      num_n.this_length <- sum(str_s.col_widths[s.idvars]) + length(s.idvars) * colspacing
-      str_s.panel_cols[[num_n.panels]] <- base::unique(c(s.idvars, str_s.this_cols))
+      num_n.this_length <- sum(num_n.col_char_widths[str_s.idvars]) + length(str_s.idvars) * colspacing
+      num_n.this_length <- num_n.this_length + num_n.col_char_widths[str_s.this_col] + colspacing
+      str_s.panel_cols[[num_n.panels]] <- base::unique(c(str_s.idvars, str_s.this_cols))
       str_s.this_cols <- str_s.this_col
       num_n.panels <- num_n.panels + 1
     }
   }
-  num_n.panel_left_col[num_n.panels] <- round((num_n.linesize - num_n.this_length )/2, 0)
-  num_n.panel_right_col[num_n.panels] <- num_n.linesize - num_n.this_length - num_n.panel_left_col[num_n.panels]
-  if (num_n.panel_right_col[num_n.panels] < 0) num_n.panel_right_col[num_n.panels] <- 0
-  if (num_n.panel_left_col[num_n.panels] < 0) num_n.panel_left_col[num_n.panels] <- 0
+  num_n.panel_left_col_char_width[num_n.panels] <- round((num_n.linesize - num_n.this_length )/2, 0)
+  num_n.panel_right_col_char_width[num_n.panels] <- num_n.linesize - num_n.this_length - num_n.panel_left_col_char_width[num_n.panels]
+  if (num_n.panel_right_col_char_width[num_n.panels] < 0) num_n.panel_right_col_char_width[num_n.panels] <- 0
+  if (num_n.panel_left_col_char_width[num_n.panels] < 0) num_n.panel_left_col_char_width[num_n.panels] <- 0
   
-  str_s.panel_cols[[num_n.panels]] <- base::unique(c(s.idvars, str_s.this_cols)) 
+  str_s.panel_cols[[num_n.panels]] <- base::unique(c(str_s.idvars, str_s.this_cols)) 
   
-  num_n.col_widths <- round((str_s.col_widths + colspacing) * num_n.fontsize * 0.595, 0)   
+  num_n.col_widths <- round((num_n.col_char_widths + colspacing) * num_n.font_size * 0.595, 0)   
   for (i in 1:num_n.panels) {
-    num_n.panel_right_col[num_n.panels] <- round(num_n.panel_right_col[num_n.panels] * num_n.fontsize * 0.595, 0)
-    num_n.panel_left_col[num_n.panels] <- round(num_n.panel_left_col[num_n.panels] * num_n.fontsize * 0.595, 0)      
+    num_n.panel_right_col_width[i] <- round(num_n.panel_right_col_char_width[i] * num_n.font_size * 0.595, 0)
+    num_n.panel_left_col_width[i] <- round(num_n.panel_left_col_char_width[i] * num_n.font_size * 0.595, 0)      
   }
 
   # print(paste0("ru_report: Check parameter PROPTIONS=", proptions))
   
   ############################################################################################################################
- 
-  # print(paste0("ru_report: Add page number to data row"))  
+  ############################################################################################################################
   
+  # print(paste0("ru_report: Add page number to data row"))  
   num_n.pagenumber <- 0
   num_n.linenumber <- 0
   num_n.addlines <- 0
   num_n.numofpages <- 1
-  num_n.wraplines <- 0
   str_s.sharecolvarvalue <- NULL
-  bln_b.addsharecollines <- FALSE
-  if (length(sharecolvars) == 0) bln_b.overallsummary <- FALSE else bln_b.overallsummary <- overallsummary
-
+  num_n.sharecolvars_level <- 0
+  num_n.overall_level <- length(sharecolvars)
+  num_n.overall_level_1 <- length(sharecolvars)
+  num_n.catlines <- 0
+  
   # df_dsetin <- df_lastdset1
   df_dsetin_1 <- NULL
   list_df_rows_list <- list()
-
-  # print(paste0("ru_report: num_n.pagesz: ", num_n.pagesz))
+  
+  # print(paste0("ru_report: num_n.pagesz: ", num_n.pagesz, "\tnum_n.pagesize", num_n.pagesize))
   
   for (i in 1:base::nrow(df_dsetin)) {
-    num_n.catlines <- 0
-    num_n.addlines <- 0
-    bln_b.overallsummary_line <- FALSE
-    if (length(sharecolvars) > 0) {
-      str_s.sharecolvarvalue <- NULL
-      for (j in 1:(length(sharecolvars) - 1)) {
-        num_n.numoflines1 <- stringr::str_count(df_dsetin[i, sharecolvars[j]], str_s.line_break) + 1
-        num_n.addlines <- num_n.addlines + num_n.numoflines1
-        if ( i == 1 || (df_dsetin[i, sharecolvars[j]] != df_dsetin[i - 1, sharecolvars[j]])) {
-          if (bln_b.overallsummary && (i==1 || j < length(sharecolvars) - 1)) {
-            num_n.addlines <- num_n.addlines - num_n.numoflines1
-            bln_b.overallsummary_line <- TRUE
-          }
-          bln_b.addsharecollines <- TRUE
+    # for (i in 1:40) {
+    # num_n.catlines <- 0
+    bln_b.newpage <- FALSE
+    bln_b.newcompute <- FALSE
+    
+    if (i == 1) {
+      bln_b.newpage <- TRUE
+      bln_b.newcompute <- TRUE
+    }
+    
+    if (i > 1 && length(computebeforepagevars) > 0) {
+      for (j in 1:length(computebeforepagevars)) {
+        if (df_dsetin[i, computebeforepagevars[j]] != df_dsetin[i - 1, computebeforepagevars[j]]) {
+          bln_b.newcompute <- TRUE
+          bln_b.newpage <- TRUE
           break
         }
       }
-    }
-    if ( length(nowidowvar) > 0 && (i==1 || df_dsetin[i, nowidowvar] != df_dsetin[i - 1, nowidowvar])) {
-      if (length(sharecolvars) > 0 && bln_b.addsharecollines && (ru_index(nowidowvar == str_s.columns_all) >= ru_index(sharecolvars[1] == str_s.columns_all))) {
-        num_n.catlines <- num_n.addlines 
-      } else if (bln_b.addsharecollines) num_n.catlines <- num_n.addlines 
+    } 
+    
+    for (n in 1:2) {
+      bln_b.nowidowchk <- FALSE    
+      num_n.addlines <- 0
+      bln_b.addline <- FALSE
       
-      if ((i+1) <= nrow(df_dsetin)) {
-        for (j in seq((i+1), nrow(df_dsetin))) {
-          if (df_dsetin[i, nowidowvar] == df_dsetin[j, nowidowvar]) {
-            num_n.catlines <- num_n.catlines + df_dsetin[j, "nlines__"] 
-            if (! is.null(str_s.skipvars)) for (k in 1:length(str_s.skipvars)) {
-              if (str_s.skipvars[k] != nowidowvar) {
-                if (j < nrow(df_dsetin) && df_dsetin[j, str_s.skipvars[k]] == df_dsetin[j + 1, str_s.skipvars[k]]) num_n.catlines <- num_n.catlines + 1
+      # sharecolvars
+      if (length(sharecolvars) > 0) {
+        num_n.sharecolvars_level <- 0
+        num_n.overall_level <- length(sharecolvars)
+        if (i == 1 || bln_b.newcompute) { 
+          num_n.sharecolvars_level <- length(sharecolvars) - 1
+          num_n.overall_level <- 0
+        }  else { 
+          for (j in 1:(length(sharecolvars) - 1)) {
+            num_n.n <- ru_index(str_s.columns_all == sharecolvars[j])
+            if (sharecolvars[j] %in% str_s.ordervars) for (l in 1:num_n.n) {
+              if (df_dsetin[i, str_s.columns_all[l]] != df_dsetin[i - 1, str_s.columns_all[l]]) {
+                num_n.sharecolvars_level <- length(sharecolvars) - j
+                num_n.overall_level <- j
+                break
+              } 
+            } else {
+              num_n.sharecolvars_level <- length(sharecolvars) - j
+              num_n.overall_level <- j
+              break
+            }
+            if (num_n.sharecolvars_level > 0 ) break 
+          }
+        } 
+        if (bln_b.newpage) num_n.sharecolvars_level <- length(sharecolvars) - 1
+        if (num_n.overall_level <  length(sharecolvars) - 1) num_n.overall_level_1 <- num_n.overall_level
+        if (num_n.overall_level > overallsummarylevel) num_n.overall_level <- length(sharecolvars)
+        
+        if (num_n.sharecolvars_level > 0) {
+          str_s.sharecolvarvalue <- NULL  
+          num_n.n <- length(sharecolvars) - num_n.sharecolvars_level - 1
+          for (j in (length(sharecolvars) - num_n.sharecolvars_level):(length(sharecolvars) -  1)) {
+            if (j <= num_n.overall_level || j == length(sharecolvars) - 1) {
+              num_n.n <- num_n.n + 1
+              if (is.null(str_s.sharecolvarvalue)) {
+                str_s.sharecolvarvalue <- base::substring(df_dsetin[i, sharecolvars[j]], sharecolvarsindent * (j - num_n.n) + 1)
+              } else {
+                str_s.sharecolvarvalue <- paste0(str_s.sharecolvarvalue, str_s.line_break, 
+                                                 base::substring(df_dsetin[i, sharecolvars[j]], sharecolvarsindent * (j - num_n.n) + 1))
               }
             }
-          } else break
+          }
+          if (! is.null(str_s.sharecolvarvalue)) {
+            num_n.numoflines1 <- stringr::str_count(str_s.sharecolvarvalue, str_s.line_break) + 1
+            num_n.addlines <- num_n.addlines + num_n.numoflines1
+            bln_b.addline <- TRUE
+          }
         }
       }
+      
+      num_n.nowidowrows <- 1
+      bln_b.nowidowchk <- FALSE
+      if (length(nowidowvar) > 0 & nrow(df_dsetin) > 1) {
+        num_n.n <- ru_index(str_s.columns_all == nowidowvar)
+        if (i > 1) for (l in 1:num_n.n) {
+          if (df_dsetin[i, str_s.columns_all[l]] != df_dsetin[i - 1, str_s.columns_all[l]]) {
+            bln_b.nowidowchk <- TRUE
+            break
+          } 
+        } else bln_b.nowidowchk <- TRUE 
+        
+        bln_b.nowidowchk2 <- FALSE
+        if (bln_b.nowidowchk & nrow(df_dsetin) >= i + 1) for (j in (i + 1):nrow(df_dsetin)) {
+          for (l in 1:num_n.n) {
+            if (df_dsetin[i, str_s.columns_all[l]] != df_dsetin[j, str_s.columns_all[l]]) {
+              bln_b.nowidowchk2 <- TRUE
+              break
+            } 
+          }
+          
+          if (bln_b.nowidowchk2) break
+          num_n.nowidowrows <- num_n.nowidowrows + 1
+        }
+      }
+      
+      # nowidowvar and skipvars
+      if ( length(nowidowvar) > 0 && (bln_b.newcompute || bln_b.nowidowchk)) {
+        num_n.catlines <- num_n.addlines
+        
+        for (j in 1:num_n.nowidowrows) {
+          num_n.catlines <- num_n.catlines + df_dsetin[i + j - 1, "nlines__"] 
+          if (! is.null(str_s.skipvars)) for (k in 1:length(str_s.skipvars)) {
+            if ((ru_index(str_s.columns_all == str_s.skipvars[k]) > ru_index(str_s.columns_all == nowidowvar)) &
+                j < num_n.nowidowrows) {
+              num_n.index <- ru_index(str_s.columns_all == str_s.skipvars[k])
+              if (i + j - 1 < nrow(df_dsetin)) for (l in 1:num_n.index) { 
+                if (df_dsetin[i + j - 1, str_s.columns_all[l]] != df_dsetin[i + j, str_s.columns_all[l]]) {
+                  num_n.catlines <- num_n.catlines + 1
+                  break
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      # if (i > 28) {
+      #   print("debug here")
+      #   browser()
+      # }
+      
+      if (n > 1) break
+      
+      if (bln_b.newcompute) bln_b.newpage <- TRUE else 
+        if ( num_n.linenumber > 3 &&  length(nowidowvar) > 0 && bln_b.nowidowchk && num_n.catlines >= num_n.pagesz - num_n.linenumber + 2) bln_b.newpage <- TRUE else 
+          if (bln_b.addline && (num_n.addlines + df_dsetin[i, "nlines__"] >= num_n.pagesz - num_n.linenumber + 2)) bln_b.newpage <- TRUE else 
+            if (df_dsetin[i, "nlines__"] >= num_n.pagesz - num_n.linenumber + 2) bln_b.newpage <- TRUE else 
+              if (i > 1) bln_b.newpage <- FALSE
+      
+      if (! bln_b.newpage | bln_b.newcompute) break
     }
-    if (i == 1) bln_b.newpage <- TRUE else 
-      if ( num_n.linenumber > 3 &&  length(nowidowvar) > 0 && num_n.catlines >= num_n.pagesz - num_n.linenumber + 2) bln_b.newpage <- TRUE else 
-        if (bln_b.addsharecollines && (num_n.addlines + df_dsetin[i, "nlines__"] >= num_n.pagesz - num_n.linenumber + 2)) bln_b.newpage <- TRUE else 
-          if (df_dsetin[i, "nlines__"] >= num_n.pagesz - num_n.linenumber + 2) bln_b.newpage <- TRUE else 
-            if (i > 1) bln_b.newpage <- FALSE
     
     # Add extra lines to fill all rows on a page
     if (i > 1 && bln_b.newpage && (num_n.pagesz - num_n.linenumber + 1 > 0)) {
-      # df_dsetin_3 <- NULL
       for (k in 1:(num_n.pagesz - num_n.linenumber + 1 )) {
         df_dsetin_2 <- list_df_rows_list[[1]][0, ] 
         df_dsetin_2[1, "nlines__"] <- 1
-        df_dsetin_2[1, "linenum__"] <- num_n.linenumber 
-        df_dsetin_2[1, "pagenum__"] <- num_n.pagenumber
+        df_dsetin_2[1, "linenum__"] <- num_n.linenumber
+        df_dsetin_2[1, "pagenum__"] <- num_n.pagenumber   
+        df_dsetin_2[1, "newpage__"] <- FALSE
+        df_dsetin_2[1, "addline__"] <- TRUE
+        df_dsetin_2[1, "sharelvl__"] <- num_n.sharecolvars_level
+        df_dsetin_2[1, "overalllvl__"] <- num_n.overall_level
+        df_dsetin_2[1, "catline__"] <- num_n.catlines
+        
         df_dsetin_2 <- df_dsetin_2 |> dplyr::mutate(dplyr::across(where(is.character), ~ " "))
-        # df_dsetin_3 <- dplyr::bind_rows(df_dsetin_3, df_dsetin_2)
         list_df_rows_list[[length(list_df_rows_list) + 1]] <- df_dsetin_2
         num_n.linenumber <- num_n.linenumber + 1
       }
-      # df_dsetin_1 <- dplyr::bind_rows(df_dsetin_1, df_dsetin_3)
     }
-    
-    if (! bln_b.newpage && length(computebeforepagevars) > 0) {
-      for (j in 1:length(computebeforepagevars)) {
-        if (df_dsetin[i, computebeforepagevars[j]] != df_dsetin[i - 1, computebeforepagevars[j]])  bln_b.newpage <- TRUE
-      }
-    } 
-    
-    df_dsetin[i, "newpage__"] <- bln_b.newpage
-    df_dsetin[i, "addline__"] <- bln_b.addsharecollines
-    df_dsetin[i, "catline__"] <- num_n.catlines
     
     if (bln_b.newpage) {
       num_n.pagenumber <- num_n.pagenumber + 1
       num_n.linenumber <- 1
-      num_n.wraplines <- 0
-      bln_b.addsharecollines <- TRUE
+      num_n.sharecolvars_level <- length(sharecolvars) - 1
       if (length(computebeforepagevars) > 0) {
         num_n.linenumber <- num_n.linenumber + length(computebeforepagevars)
       }
     } 
     
-    if ((bln_b.addsharecollines || bln_b.newpage) && length(sharecolvars) > 0 && ((! bln_b.overallsummary_line) || (bln_b.overallsummary_line && length(sharecolvars) > 2))) {
+    if (num_n.sharecolvars_level > 0) {
       df_dsetin_2 <- df_dsetin[i, ]
       df_dsetin_2[1, "linenum__"] <- num_n.linenumber
-      df_dsetin_2[1, "pagenum__"] <- num_n.pagenumber        
+      df_dsetin_2[1, "pagenum__"] <- num_n.pagenumber   
+      df_dsetin_2[1, "newpage__"] <- bln_b.newpage
+      df_dsetin_2[1, "addline__"] <- bln_b.addline
+      df_dsetin_2[1, "sharelvl__"] <- num_n.sharecolvars_level
+      df_dsetin_2[1, "overalllvl__"] <- num_n.overall_level
+      df_dsetin_2[1, "catline__"] <- num_n.catlines
+      
       num_n.index <- ru_index(sharecolvars[length(sharecolvars)] == str_s.columns_all)
       for (j in 1:length(str_s.columns_all)) {
         if (j > num_n.index) df_dsetin_2[1, str_s.columns_all[j]] <- " "
-        if (str_s.columns_all[j] == sharecolvars[length(sharecolvars)]) {
-          str_s.sharecolvarvalue <- NULL
-          if (bln_b.overallsummary_line) num_n.loop_levels_adjust <- 2 else num_n.loop_levels_adjust <- 1
-          for (k in 1:(length(sharecolvars) - num_n.loop_levels_adjust)) {
-            if (is.null(str_s.sharecolvarvalue)) {
-              str_s.sharecolvarvalue <- df_dsetin[i, sharecolvars[k]]
-            } else {
-              str_s.sharecolvarvalue <- paste0(str_s.sharecolvarvalue, str_s.line_break, df_dsetin[i, sharecolvars[k]])
-            }
-          }
-          df_dsetin_2[1, sharecolvars[length(sharecolvars)]]  <- str_s.sharecolvarvalue
-        }
       }
-      num_n.linenumber <- num_n.linenumber + num_n.addlines
-      num_n.wraplines <- num_n.wraplines + num_n.addlines - 1
-      df_dsetin_2[1, "nlines__"] <- num_n.addlines
-      # df_dsetin_1 <- dplyr::bind_rows(df_dsetin_1, df_dsetin_2)
-      list_df_rows_list[[length(list_df_rows_list) + 1]] <- df_dsetin_2
+      if (! is.null(str_s.sharecolvarvalue)) {
+        df_dsetin_2[1, sharecolvars[length(sharecolvars)]]  <- str_s.sharecolvarvalue
+        num_n.linenumber <- num_n.linenumber + num_n.addlines
+        df_dsetin_2[1, "nlines__"] <- num_n.addlines
+        list_df_rows_list[[length(list_df_rows_list) + 1]] <- df_dsetin_2
+      }
     } 
     
     df_dsetin_2 <- df_dsetin[i, ]
-    if (bln_b.overallsummary_line) df_dsetin_2[1, sharecolvars[length(sharecolvars)]] <- base::substring(df_dsetin_2[1, sharecolvars[length(sharecolvars)]], sharecolvarsindent + 1)
-    df_dsetin_2[["linenum__"]] <- num_n.linenumber
-    df_dsetin_2[["pagenum__"]] <- num_n.pagenumber   
+    if (num_n.overall_level_1 < length(sharecolvars) & overallsummarylevel > num_n.overall_level_1) {
+      df_dsetin_2[1, sharecolvars[length(sharecolvars)]] <- base::substring(df_dsetin_2[1, sharecolvars[length(sharecolvars)]],
+                                                                            sharecolvarsindent * (overallsummarylevel - num_n.overall_level_1 - 1) + 1)
+      
+      if ( is.null(str_s.ordervars) | bln_b.newpage) {
+        list_l.line_counts_1 <- lapply(df_dsetin_2[str_s.visible_cols], function(column) {
+          stringr::str_count(column, stringr::fixed(str_s.line_break)) + 1
+        })
+        
+        df_dsetin_2$nlines__ <- do.call(base::pmax, as.data.frame(list_l.line_counts_1))
+      }
+    }
+    
+    # Ordervars
+    if (! is.null(str_s.ordervars) & (! bln_b.newpage)) {
+      for (j in (length(str_s.visible_ordervars)):1) {
+        num_n.n <- ru_index(str_s.columns_all == str_s.visible_ordervars[j])
+        bln_b.changed <- base::any(
+          df_dsetin[i, str_s.columns_all[num_n.n]] != df_dsetin[i - 1, str_s.columns_all[num_n.n]]
+        )
+        
+        if (!bln_b.changed) {
+          df_dsetin_2[1, str_s.visible_ordervars[1:j]] <- " "
+          break
+        }
+      } 
+      list_l.line_counts_1 <- lapply(df_dsetin_2[str_s.visible_cols], function(column) {
+        stringr::str_count(column, stringr::fixed(str_s.line_break)) + 1
+      })
+      df_dsetin_2$nlines__ <- do.call(base::pmax, as.data.frame(list_l.line_counts_1))
+    }
+    
+    if (bln_b.newpage & num_n.sharecolvars_level > 0 & ! is.null(str_s.sharecolvarvalue)) bln_b.newpage <- FALSE
+    
+    df_dsetin_2[1, "linenum__"] <- num_n.linenumber
+    df_dsetin_2[1, "pagenum__"] <- num_n.pagenumber   
+    df_dsetin_2[1, "newpage__"] <- bln_b.newpage
+    df_dsetin_2[1, "addline__"] <- FALSE
+    df_dsetin_2[1, "sharelvl__"] <- num_n.sharecolvars_level
+    df_dsetin_2[1, "overalllvl__"] <- num_n.overall_level
+    df_dsetin_2[1, "catline__"] <- num_n.catlines
+    
     # df_dsetin_1 <- dplyr::bind_rows(df_dsetin_1, df_dsetin_2)  
     list_df_rows_list[[length(list_df_rows_list) + 1]] <- df_dsetin_2
     
-    
     num_n.linenumber <- num_n.linenumber + unlist(df_dsetin[i, "nlines__"])
-    num_n.wraplines <- num_n.wraplines + df_dsetin[i, "nlines__"] - 1
     
     # Add skip lines
-    if (length(str_s.skipvars) > 0 & num_n.linenumber < num_n.pagesz + 1) for (k in 1:length(str_s.skipvars)) {
-      if ( i < nrow(df_dsetin) && df_dsetin[i, str_s.skipvars[k]] != df_dsetin[i + 1, str_s.skipvars[k]]) {
-        df_dsetin_2 <- list_df_rows_list[[1]][0, ] 
-        df_dsetin_2[1, "nlines__"] <- 1
-        df_dsetin_2[1, "linenum__"] <- num_n.linenumber 
-        df_dsetin_2[1, "pagenum__"] <- num_n.pagenumber
-        df_dsetin_2 <- df_dsetin_2 |> dplyr::mutate(dplyr::across(where(is.character), ~ " "))
-        # df_dsetin_1 <- dplyr::bind_rows(df_dsetin_1, df_dsetin_2)
-        list_df_rows_list[[length(list_df_rows_list) + 1]] <- df_dsetin_2
-        
-        num_n.linenumber <- num_n.linenumber + 1
+    if (length(str_s.skipvars) > 0 & num_n.linenumber + length(str_s.skipvars) <= num_n.pagesz) for (k in 1:length(str_s.skipvars)) {
+      num_n.index <- ru_index(str_s.columns_all == str_s.skipvars[k]) 
+      if ( i < nrow(df_dsetin)) for (l in 1:num_n.index) {
+        if (df_dsetin[i, str_s.columns_all[l]] != df_dsetin[i + 1, str_s.columns_all[l]]) {
+          df_dsetin_2 <- list_df_rows_list[[1]][0, ]
+          df_dsetin_2[1, "nlines__"] <- 1
+          df_dsetin_2[1, "linenum__"] <- num_n.linenumber
+          df_dsetin_2[1, "pagenum__"] <- num_n.pagenumber
+          df_dsetin_2[1, "newpage__"] <- FALSE
+          df_dsetin_2[1, "addline__"] <- TRUE
+          df_dsetin_2[1, "sharelvl__"] <- num_n.sharecolvars_level
+          df_dsetin_2[1, "overalllvl__"] <- num_n.overall_level
+          df_dsetin_2[1, "catline__"] <- num_n.catlines
+          df_dsetin_2 <- df_dsetin_2 |> dplyr::mutate(dplyr::across(where(is.character), ~ " "))
+          # df_dsetin_1 <- dplyr::bind_rows(df_dsetin_1, df_dsetin_2)
+          list_df_rows_list[[length(list_df_rows_list) + 1]] <- df_dsetin_2
+          num_n.linenumber <- num_n.linenumber + 1
+          break
+        }
       }
     } 
-    
-    bln_b.newpage <- FALSE
-    bln_b.addsharecollines <- FALSE
   }
   
-  # Add extra lines to fill all rows on a page
+  # Add lines to end of the page
   if (num_n.pagesz - num_n.linenumber + 1 > 0) {
-    # df_dsetin_3 <- NULL
     for (k in 1:(num_n.pagesz - num_n.linenumber + 1)) {
-      df_dsetin_2 <- list_df_rows_list[[1]][0, ] 
+      df_dsetin_2 <- list_df_rows_list[[1]][0, ]
       df_dsetin_2[1, "nlines__"] <- 1
-      df_dsetin_2[1, "linenum__"] <- num_n.linenumber 
+      df_dsetin_2[1, "linenum__"] <- num_n.linenumber
       df_dsetin_2[1, "pagenum__"] <- num_n.pagenumber
+      df_dsetin_2[1, "newpage__"] <- FALSE
+      df_dsetin_2[1, "addline__"] <- FALSE
+      df_dsetin_2[1, "sharelvl__"] <- num_n.sharecolvars_level
+      df_dsetin_2[1, "overalllvl__"] <- num_n.overall_level
+      df_dsetin_2[1, "catline__"] <- num_n.catlines
       df_dsetin_2 <- df_dsetin_2 |> dplyr::mutate(dplyr::across(where(is.character), ~ " "))
-      # df_dsetin_3 <- dplyr::bind_rows(df_dsetin_3, df_dsetin_2)
       list_df_rows_list[[length(list_df_rows_list) + 1]] <- df_dsetin_2
       num_n.linenumber <- num_n.linenumber + 1
     }
-    # df_dsetin_1 <- dplyr::bind_rows(df_dsetin_1, df_dsetin_3)
   }
   
   df_dsetin_1 <- dplyr::bind_rows(list_df_rows_list)
   df_dsetin_1 |> dplyr::filter(pagenum__==1)
   
-  df_dsetin <- ru_labels(df_dsetin_1, str_s.var_labels) |> dplyr::select(-catline__, -addline__, -newpage__, -nlines__)
-
+  df_dsetin <- ru_labels(df_dsetin_1, str_s.var_labels) |> dplyr::select(-catline__, -addline__, -overalllvl__, -sharelvl__, -newpage__)
+  
   str_s.columns_all <- c("pagenum__", str_s.columns_all)
   str_s.ordervars <- c(str_s.ordervars, "pagenum__")
   
@@ -983,61 +1155,61 @@ ru_report <- function(
   for (i in 1:num_n.numofpages) {
     str_s.computebeforepagelines <- NULL
     if (length(computebeforepagevars) > 0) {
+      str_s.computebeforepagelines <- NULL
       for (j in 1:length(computebeforepagevars)) {
-        if (j==1) {
-          str_s.computebeforepagelines <- paste0(computebeforepagelines[(j-1) * 2 + 1], unlist(df_dsetin %>% 
-            dplyr::filter(pagenum__ == !! i) %>% dplyr::select(!!! rlang::syms(computebeforepagelines[(j-1) * 2 + 2]))
-            %>% dplyr::distinct())[1])
-        } else {
-          str_s.computebeforepagelines <- paste(str_s.computebeforepagelines, paste0(computebeforepagelines[(j-1) * 2 + 1], unlist(df_dsetin %>% 
-            dplyr::filter(pagenum__ == !! i) %>% dplyr::select(!!! rlang::syms(computebeforepagelines[(j-1) * 2 + 2])) 
-            %>% dplyr::distinct())[1]), sep=str_s.line_break2)
-        }
+        str_s.tmp <-  paste0(computebeforepagelines[(j-1) * 2 + 1], 
+                             unlist(df_dsetin %>% 
+                                      dplyr::filter(pagenum__ == !! i) %>% 
+                                      dplyr::select(!!! rlang::syms(computebeforepagelines[(j-1) * 2 + 2])) %>% 
+                                      dplyr::distinct())[1])    
+        str_s.tmp  <- base::gsub(" ", str_s.hold_space, base::substring(paste0(str_s.tmp, base::strrep(" ", num_n.linesize)), 1, num_n.linesize))
+        str_s.computebeforepagelines <- base::ifelse(j==1, str_s.tmp, c(str_s.computebeforepagelines, str_s.tmp))
       }
+      str_s.computebeforepagelines <- paste(str_s.computebeforepagelines, collapse =str_s.line_break2)
     }
 
     for (j in 1:num_n.panels) {
       num_n.page <- (i - 1) * num_n.panels + j
       str_s.headers <- NULL
       if (num_n.headers > 0) for (k in 1:num_n.headers) {
-        str_s.temp_left <- base::gsub("pageof", paste0("Page ", num_n.page, " of ", num_n.numofpages * num_n.panels), str_s.leftheaders[k], fixed = TRUE)
-        str_s.temp_right <- base::gsub("pageof", paste0("Page ", num_n.page, " of ", num_n.numofpages * num_n.panels), str_s.rightheaders[k], fixed = TRUE)
-        str_s.temp_center <- base::gsub("pageof", paste0("Page ", num_n.page, " of ", num_n.numofpages * num_n.panels), str_s.centerheaders[k], fixed = TRUE)
+        str_s.tmp_left <- base::gsub("pageof", paste0("Page ", num_n.page, " of ", num_n.numofpages * num_n.panels), str_s.leftheaders[k], fixed = TRUE)
+        str_s.tmp_right <- base::gsub("pageof", paste0("Page ", num_n.page, " of ", num_n.numofpages * num_n.panels), str_s.rightheaders[k], fixed = TRUE)
+        str_s.tmp_center <- base::gsub("pageof", paste0("Page ", num_n.page, " of ", num_n.numofpages * num_n.panels), str_s.centerheaders[k], fixed = TRUE)
         
-        str_s.tmp <- paste0(str_s.temp_left, base::strrep(" ", num_n.linesize))
-        if (! str_s.temp_center %in% c("", " ")) str_s.tmp <- paste0(base::substring(str_s.tmp, 1, base::floor((num_n.linesize - base::nchar(str_s.temp_center))/2)), str_s.temp_center)
-        if (! str_s.temp_right %in% c("", " ")) str_s.tmp <- paste0(base::substring(str_s.tmp, 1, num_n.linesize - base::nchar(str_s.temp_right)),  str_s.temp_right)
+        str_s.tmp <- paste0(str_s.tmp_left, base::strrep(" ", num_n.linesize))
+        if (! str_s.tmp_center %in% c("", " ")) str_s.tmp <- paste0(base::substring(str_s.tmp, 1, base::floor((num_n.linesize - base::nchar(str_s.tmp_center))/2)), str_s.tmp_center)
+        if (! str_s.tmp_right %in% c("", " ")) str_s.tmp <- paste0(base::substring(str_s.tmp, 1, num_n.linesize - base::nchar(str_s.tmp_right)),  str_s.tmp_right)
         str_s.headers <- c(str_s.headers, base::gsub(" ", str_s.hold_space, base::substring(str_s.tmp, 1, num_n.linesize), fixed=TRUE))
       } 
       
       str_s.titles_1 <- NULL
       if (length(str_s.titles) > 0) for (k in 1:length(str_s.titles)) {
-        str_s.tmp <- paste0(base::strrep(str_s.hold_space, base::floor((num_n.linesize - base::nchar(str_s.titles[k]))/2)), str_s.titles[k],  base::strrep(str_s.hold_space, num_n.linesize))  
+        str_s.tmp <- paste0(base::strrep(str_s.hold_space, base::max(0, base::floor((num_n.linesize - base::nchar(str_s.titles[k]))/2))), str_s.titles[k],  
+                            base::strrep(str_s.hold_space, num_n.linesize))  
         str_s.titles_1 <- c(str_s.titles_1, base::substring(str_s.tmp, 1, num_n.linesize))
       }
       str_s.headers <- c(str_s.headers, str_s.titles_1)
       str_s.thistitle <- paste(c(str_s.headers, str_s.hold_space), collapse =str_s.line_break2) # added a line below the title.
-
       str_s.footers <- NULL
       if (num_n.footers > 0) for (k in 1:num_n.footers) {
-        str_s.temp_left <- base::gsub("pageof", paste0("Page ", num_n.page, " of ", num_n.numofpages * num_n.panels), str_s.leftfooters[k], fixed = TRUE)
-        str_s.temp_right <- base::gsub("pageof", paste0("Page ", num_n.page, " of ", num_n.numofpages * num_n.panels), str_s.rightfooters[k], fixed = TRUE)
-        str_s.temp_center <- base::gsub("pageof", paste0("Page ", num_n.page, " of ", num_n.numofpages * num_n.panels), str_s.centerfooters[k], fixed = TRUE)
+        str_s.tmp_left <- base::gsub("pageof", paste0("Page ", num_n.page, " of ", num_n.numofpages * num_n.panels), str_s.leftfooters[k], fixed = TRUE)
+        str_s.tmp_right <- base::gsub("pageof", paste0("Page ", num_n.page, " of ", num_n.numofpages * num_n.panels), str_s.rightfooters[k], fixed = TRUE)
+        str_s.tmp_center <- base::gsub("pageof", paste0("Page ", num_n.page, " of ", num_n.numofpages * num_n.panels), str_s.centerfooters[k], fixed = TRUE)
         
-        str_s.tmp <- paste0(str_s.temp_left, base::strrep(" ", num_n.linesize))
-        if (! str_s.temp_center %in% c("", " ")) str_s.tmp <- paste0(base::substring(str_s.tmp, 1, base::floor((num_n.linesize - base::nchar(str_s.temp_center))/2)), str_s.temp_center)
-        if (! str_s.temp_right %in% c("", " ")) str_s.tmp <- paste0(base::substring(str_s.tmp, 1, num_n.linesize - base::nchar(str_s.temp_right)),  str_s.temp_right)
+        str_s.tmp <- paste0(str_s.tmp_left, base::strrep(" ", num_n.linesize))
+        if (! str_s.tmp_center %in% c("", " ")) str_s.tmp <- paste0(base::substring(str_s.tmp, 1, base::floor((num_n.linesize - base::nchar(str_s.tmp_center))/2)), str_s.tmp_center)
+        if (! str_s.tmp_right %in% c("", " ")) str_s.tmp <- paste0(base::substring(str_s.tmp, 1, num_n.linesize - base::nchar(str_s.tmp_right)),  str_s.tmp_right)
         str_s.footers <- c(str_s.footers, base::gsub(" ", str_s.hold_space, base::substring(str_s.tmp, 1, num_n.linesize), fixed=TRUE))
       }   
       str_s.thisfooter <- if (!is.null(str_s.footers)) paste(str_s.footers, collapse =str_s.line_break2) else NULL
 
       df_this_dset <- df_dsetin %>% dplyr::filter(pagenum__ == !! i) 
       str_s.this_cols <- base::unique(str_s.panel_cols[[j]])
-      if (num_n.panel_left_col[j] > 0) {
+      if (num_n.panel_left_col_width[j] > 0) {
         str_s.this_cols <- c("this_left_col__", str_s.this_cols)
         df_this_dset <- df_this_dset %>% dplyr::mutate(this_left_col__="") 
       }
-      if (num_n.panel_right_col[j] > 0) {
+      if (num_n.panel_right_col_width[j] > 0) {
         str_s.this_cols <- c(str_s.this_cols, "this_right_col__")
         df_this_dset <- df_this_dset %>% dplyr::mutate(this_right_col__="") 
       }
@@ -1078,7 +1250,6 @@ ru_report <- function(
             footnote = str_s.thisfooter
           )
       }
-      
       
       # 
       # %>%
@@ -1163,28 +1334,28 @@ ru_report <- function(
           )
       }
       # column width
-      if (num_n.panel_right_col[j] > 0) {
+      if (num_n.panel_right_col_width[j] > 0) {
         str_s.this_col <- "this_right_col__"
         this_gt_tbl[[num_n.page]] <- this_gt_tbl[[num_n.page]] %>%
           gt::cols_label(
             this_right_col__=""
           ) %>%
           gt::cols_width(
-            rlang::new_formula(as.name(str_s.this_col), paste0(num_n.panel_right_col[j] * 4/3, "px"))
+            rlang::new_formula(as.name(str_s.this_col), paste0(num_n.panel_right_col_width[j] * 4/3, "px"))
             
           )
       }
       # width of left and right blank column
-      if (num_n.panel_left_col[j] > 0) {
+      if (num_n.panel_left_col_width[j] > 0) {
         str_s.this_col <- "this_left_col__"
         this_gt_tbl[[num_n.page]] <- this_gt_tbl[[num_n.page]] %>%
           gt::cols_label(
             this_left_col__=""
           ) %>%
           gt::cols_width(
-            # this_left_col__ ~ paste0(num_n.panel_left_col[j], "pt")
-            # rlang::new_formula(as.name(str_s.this_col), paste0(num_n.panel_left_col[j], "pt"))
-            rlang::new_formula(as.name(str_s.this_col), paste0(num_n.panel_left_col[j] * 4/3, "px"))
+            # this_left_col__ ~ paste0(num_n.panel_left_col_width[j], "pt")
+            # rlang::new_formula(as.name(str_s.this_col), paste0(num_n.panel_left_col_width[j], "pt"))
+            rlang::new_formula(as.name(str_s.this_col), paste0(num_n.panel_left_col_width[j] * 4/3, "px"))
           )
       }
     }
@@ -1192,5 +1363,3 @@ ru_report <- function(
   
   return(this_gt_tbl)
 }
-
-
